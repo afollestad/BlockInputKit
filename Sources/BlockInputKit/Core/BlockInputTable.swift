@@ -156,10 +156,11 @@ struct BlockInputTable: Equatable {
         let escapedHeader = normalizedHeader.map(escapeCellText)
         let escapedRows = normalizedRows.map { $0.map(escapeCellText) }
         let delimiters = normalizedAlignments.map(delimiterMarkdown)
-        let widths = (0..<columnCount).map { column in
-            ([escapedHeader[column], delimiters[column]] + escapedRows.map { $0[column] })
-                .map { ($0 as NSString).length }
-                .max() ?? 3
+        let widths: [Int] = (0..<columnCount).map { column in
+            var columnTexts: [String] = [escapedHeader[column], delimiters[column]]
+            columnTexts.append(contentsOf: escapedRows.map { $0[column] })
+            let lengths = columnTexts.map(\.utf16Length)
+            return lengths.max() ?? 3
         }
 
         var markdownLines: [String] = []
