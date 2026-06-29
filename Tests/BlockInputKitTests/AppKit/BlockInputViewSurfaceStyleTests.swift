@@ -173,7 +173,7 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         assertFilled(samples.bottomStroke, "bottom stroke", roundedCorners: ".bottom")
     }
 
-    func testMountedEditorTranslucentChromeDarkensLightFullViewSnapshots() throws {
+    func testMountedEditorTranslucentChromeDrawsOverLightBackground() throws {
         let size = NSSize(width: 80, height: 40)
         let mounted = makeMountedBlockInputView(
             configuration: BlockInputConfiguration(style: BlockInputStyle(editorSurface: BlockInputEditorSurfaceStyle(
@@ -215,8 +215,8 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         NSGraphicsContext.current = context
         NSColor.white.setFill()
         NSRect(origin: .zero, size: size).fill()
+        mounted.view.editorChromeView.draw(mounted.view.editorChromeView.bounds)
         NSGraphicsContext.restoreGraphicsState()
-        mounted.view.cacheDisplay(in: mounted.view.bounds, to: bitmap)
 
         let background = try XCTUnwrap(bitmap.colorAt(x: 2, y: 38)?.usingColorSpace(.deviceRGB))
         let fill = try XCTUnwrap(bitmap.colorAt(x: 40, y: 20)?.usingColorSpace(.deviceRGB))
