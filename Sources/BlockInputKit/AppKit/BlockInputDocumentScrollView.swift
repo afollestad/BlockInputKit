@@ -5,6 +5,9 @@ final class BlockInputDocumentScrollView: NSScrollView {
     var onContentBoundsDidChange: (() -> Void)?
     weak var blockInputView: BlockInputView?
 
+    // Editor chrome can sit behind the scroll stack, so cached rendering must preserve transparency.
+    override var isOpaque: Bool { false }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         configureBoundsObservation()

@@ -33,7 +33,9 @@ final class BlockInputViewSurfaceStyleTests: XCTestCase {
         ))
 
         XCTAssertNil(mounted.view.layer?.backgroundColor)
+        XCTAssertFalse(mounted.view.scrollView.isOpaque)
         XCTAssertEqual(mounted.view.scrollView.contentView.backgroundColor, .clear)
+        XCTAssertFalse(mounted.view.collectionView.isOpaque)
         XCTAssertTrue(mounted.view.collectionView.backgroundColors.isEmpty)
     }
 

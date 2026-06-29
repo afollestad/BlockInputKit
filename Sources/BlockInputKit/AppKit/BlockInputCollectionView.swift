@@ -5,6 +5,9 @@ final class BlockInputCollectionView: NSCollectionView {
     weak var blockInputView: BlockInputView?
     private weak var blockSelectionDragItem: BlockInputBlockItem?
 
+    // Editor chrome can sit behind the collection stack, so cached rendering must preserve transparency.
+    override var isOpaque: Bool { false }
+
     override func layout() {
         super.layout()
         blockInputView?.updateVisibleItemWidthsForCurrentWidth()
