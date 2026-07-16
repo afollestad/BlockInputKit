@@ -166,6 +166,30 @@ Read-only mode suppresses mutation commands, typing, paste/drop insertion, reord
 editing controls, completion acceptance, and edit modals. Link opening and host-handled slash chip clicks can still run
 when they do not mutate the document.
 
+### Provisional Text Replacement
+
+AppKit hosts can stream cumulative text, such as live speech recognition, into the current caret or same-block text
+selection without adding every partial result to undo history:
+
+```swift
+switch editor.beginProvisionalTextReplacement() {
+case .started(let session):
+    _ = editor.updateProvisionalTextReplacement(session, text: "live cumulative text")
+    _ = editor.finishProvisionalTextReplacement(session, disposition: .commit)
+case .unavailable(let reason):
+    print("Cannot begin provisional text:", reason)
+}
+```
+
+Only one provisional replacement may be active. Interim updates always replace the originally snapshotted range, may
+continue after the host reconfigures the same editor and document store as read-only, and publish through the normal
+granular document-store callbacks. Committing registers one `Text Edit` undo operation. Cancelling restores the exact
+original block and selection without creating undo history.
+
+The session invalidates if the target block changes unexpectedly, disappears, moves to another document store, or the
+editor detaches. Hosts should finish or cancel before replacing the editor or its store. Tables, images, horizontal
+rules, whole-block selections, and cross-block selections are intentionally unsupported.
+
 ### Editor Height Sizing
 
 Height sizing is opt-in. When enabled, the editor reports a rendered-content preferred height that starts at a default

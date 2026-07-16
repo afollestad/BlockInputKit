@@ -8,6 +8,9 @@
 
 ## Editing Operations
 
+- Keep host-driven provisional text cumulative from its original range, store-first validated, and on the existing granular replacement path. Interim updates must not add undo history; commit adds one text edit, while cancel restores the exact original selection without undo.
+- Let an issued provisional-text token continue through a same-store read-only reconfiguration, but invalidate it on unexpected target-block changes, store replacement, or editor detach.
+
 - Keep large-document same-row replacements, such as empty quote to paragraph, on mounted item reconfiguration instead of `reloadItems`; benchmark this with `--benchmark-100k-mutations`.
 - Keep multiline quote/code exits on granular replacement-plus-insertion operations; pressing Return on an empty inline line should not fall back to full document structural edits.
 - For non-large replacement-plus-insertion edits, do not mix `reloadItems` and `insertItems` after the document count has changed; reload the visible layout coherently to avoid overlapping rows.

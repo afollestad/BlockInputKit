@@ -382,24 +382,31 @@ extension BlockInputView {
     func applyGranularBlockReplacement(
         _ block: BlockInputBlock,
         at index: Int,
-        selection: BlockInputSelection?
+        selection: BlockInputSelection?,
+        authorizedProvisionalSession: BlockInputProvisionalTextSession? = nil
     ) -> Bool {
-        guard isEditable else { return false }
+        guard isEditable || isActiveProvisionalTextSession(authorizedProvisionalSession) else { return false }
         syncDocumentStore(.replaceBlock(block))
-        _ = replaceCachedBlock(block, at: index)
-        applySelection(validUndoSelection(selection), notify: true)
-        // Image dimensions can resolve or undo after mounting; refresh flow metrics so scroll bounds include the full block height.
-        if reconfigureVisibleReplacement(block, at: index, requiresDeferredLayout: false, invalidatesLayoutMetrics: block.kind.isImage) {
-            publishDocumentChange()
-            invalidatePreferredHeight()
-            return true
+        guard canContinueAuthorizedProvisionalReplacement(
+            authorizedProvisionalSession,
+            expectedBlock: block
+        ) else {
+            return false
         }
-        collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
-        collectionView.layoutSubtreeIfNeeded()
-        restoreMountedSelection()
-        publishDocumentChange()
-        invalidatePreferredHeight()
-        return true
+        guard let resolvedIndex = authorizedProvisionalSession == nil ? index : self.index(of: block.id) else { return false }
+        _ = replaceCachedBlock(block, at: resolvedIndex)
+        applySelection(validUndoSelection(selection), notify: true)
+        guard canContinueAuthorizedProvisionalReplacement(
+            authorizedProvisionalSession,
+            expectedBlock: block
+        ) else {
+            return false
+        }
+        return presentGranularBlockReplacement(
+            block,
+            at: resolvedIndex,
+            authorizedProvisionalSession: authorizedProvisionalSession
+        )
     }
 
     func applyGranularBlockReplacements(

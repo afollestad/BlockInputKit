@@ -9,6 +9,7 @@ extension BlockInputView {
     func configure(_ configuration: BlockInputConfiguration, restoresFocus: Bool) {
         let configuredDocumentStore = configuration.documentStore
         let previousDocumentStore = documentStore
+        reconcileProvisionalTextReplacementBeforeConfiguration(documentStore: configuredDocumentStore)
         let previousDocument = document
         let wasEditable = isEditable
         let wasDocumentCacheSynchronized = isDocumentCacheSynchronized
@@ -24,6 +25,7 @@ extension BlockInputView {
         let configuredDocument = reusesLargeDocumentCache ? previousDocument : configuration.document.detachedStorage()
         document = configuredDocument
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
+        reconcileProvisionalTextReplacementAfterConfiguration()
         configureStyle(configuration)
         configureEditorSurface(configuration)
         dismissMutationUIIfNeeded(wasEditable: wasEditable)

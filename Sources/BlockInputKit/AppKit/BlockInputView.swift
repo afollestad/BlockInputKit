@@ -87,6 +87,7 @@ public final class BlockInputView: NSView {
     var documentChangeSnapshotDelay: TimeInterval = 0.25
     var onSelectionChange: ((BlockInputSelection?) -> Void)?
     var onFocusChange: ((Bool) -> Void)?
+    var provisionalTextReplacementState: ProvisionalTextReplacementState?
     // Large store-backed granular inserts skip updating this duplicate snapshot
     // so repeated Return in 100k-block documents stays on the indexed store path.
     var isDocumentCacheSynchronized = true

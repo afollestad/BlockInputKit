@@ -131,6 +131,7 @@ extension BlockInputView {
     }
 
     func handleDocumentStoreChange(_ change: BlockInputDocumentStoreChange) {
+        reconcileProvisionalTextReplacementAfterStoreChange(change)
         switch change {
         case .loadingStateChanged:
             updatePlaceholderVisibility()

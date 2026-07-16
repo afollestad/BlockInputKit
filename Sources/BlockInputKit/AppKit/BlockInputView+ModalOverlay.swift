@@ -4,6 +4,7 @@ extension BlockInputView {
     public override func viewWillMove(toWindow newWindow: NSWindow?) {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil {
+            invalidateProvisionalTextReplacement()
             dismissLinkModal(restoreFocus: false)
             dismissImageModal(restoreFocus: false)
         }
