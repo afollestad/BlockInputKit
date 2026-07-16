@@ -347,6 +347,11 @@ public struct BlockInputConfiguration {
     public var modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)?
     /// Built-in completion popup behavior, including caret anchoring and optional overlay hosting.
     public var completionPopupConfiguration: BlockInputCompletionPopupConfiguration
+    /// Called when editor-owned completion or mutation UI becomes presented or dismissed.
+    ///
+    /// The callback runs only when the aggregate state changes. Query
+    /// `BlockInputView.hasPresentedEditorInteractionUI` for the current state after binding a new callback.
+    public var onEditorInteractionUIChange: (@MainActor (Bool) -> Void)?
     /// Convenience access to `completionPopupConfiguration.placement`.
     public var completionPopupPlacement: BlockInputCompletionPopupPlacement {
         get { completionPopupConfiguration.placement }
@@ -421,6 +426,7 @@ public struct BlockInputConfiguration {
         modalOverlayProvider: (@MainActor (BlockInputModalOverlayContext) -> BlockInputModalOverlay?)? = nil,
         completionPopupPlacement: BlockInputCompletionPopupPlacement = .caret,
         completionPopupConfiguration: BlockInputCompletionPopupConfiguration? = nil,
+        onEditorInteractionUIChange: (@MainActor (Bool) -> Void)? = nil,
         onDocumentMutation: ((BlockInputDocumentChange) -> Void)? = nil,
         onDocumentChange: ((BlockInputDocument) -> Void)? = nil,
         documentChangeSnapshotDelay: TimeInterval = 0.25,
@@ -465,6 +471,7 @@ public struct BlockInputConfiguration {
         self.completionPopupConfiguration = completionPopupConfiguration ?? BlockInputCompletionPopupConfiguration(
             placement: completionPopupPlacement
         )
+        self.onEditorInteractionUIChange = onEditorInteractionUIChange
         self.onDocumentMutation = onDocumentMutation
         self.onDocumentChange = onDocumentChange
         self.documentChangeSnapshotDelay = documentChangeSnapshotDelay

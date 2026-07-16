@@ -8,10 +8,10 @@ final class BlockInputCompletionPopupPlacementTests: XCTestCase {
         let provider = PlacementCompletionProvider(suggestions: [
             .fileLink(label: "README.md", fileURL: URL(fileURLWithPath: "/tmp/README.md"))
         ])
-        let caretView = try await startRootCompletion(provider: provider, placement: .caret)
+        let caret = try await startRootCompletion(provider: provider, placement: .caret)
         let top = try await startHostedCompletion(provider: provider, placement: .overlay)
 
-        let caretFrame = try XCTUnwrap(caretView.completionPopupView?.frame)
+        let caretFrame = try XCTUnwrap(caret.view.completionPopupView?.frame)
         let topFrame = try XCTUnwrap(top.view.completionPopupView?.frame)
         let overlay = top.view.convert(NSPoint(x: top.view.bounds.minX, y: top.view.bounds.maxY), to: top.host)
 
@@ -67,7 +67,7 @@ final class BlockInputCompletionPopupPlacementTests: XCTestCase {
     private func startRootCompletion(
         provider: any BlockInputCompletionProvider,
         placement: BlockInputCompletionPopupPlacement
-    ) async throws -> BlockInputView {
+    ) async throws -> (view: BlockInputView, window: NSWindow) {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [
                 BlockInputBlock(id: "block", text: "@read")
@@ -78,7 +78,7 @@ final class BlockInputCompletionPopupPlacementTests: XCTestCase {
         try startCompletion(in: mounted.view)
         await mounted.view.completionRequestTask?.value
         mounted.view.layoutSubtreeIfNeeded()
-        return mounted.view
+        return mounted
     }
 
     private func startHostedCompletion(

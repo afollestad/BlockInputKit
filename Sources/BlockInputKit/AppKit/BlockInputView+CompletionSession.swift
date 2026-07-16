@@ -1,6 +1,6 @@
 import AppKit
 
-struct BlockInputCompletionToken: Equatable {
+struct BlockInputCompletionToken: Equatable, Sendable {
     var trigger: BlockInputCompletionTrigger
     var replacementRange: NSRange
     var query: String
@@ -163,6 +163,7 @@ extension BlockInputView {
         completionPopupView?.removeFromSuperview()
         completionPopupView = nil
         removeCompletionPopupDismissalMonitor()
+        publishEditorInteractionUIChangeIfNeeded()
         updateInlineHintsForVisibleItems()
     }
 
@@ -298,6 +299,10 @@ extension BlockInputView {
     }
 
     private func requestCompletionSuggestions(for session: BlockInputCompletionSession) {
+        let requestIdentity = session.requestIdentity
+        guard completionSession?.requestIdentity == requestIdentity else {
+            return
+        }
         completionRequestTask?.cancel()
         guard let request = completionRequest(
             trigger: session.token.trigger,
@@ -313,7 +318,7 @@ extension BlockInputView {
         }
         completionRequestTask = Task.detached(
             priority: .userInitiated
-        ) { [weak self, provider = request.provider, context = request.context, sessionID = session.id] in
+        ) { [weak self, provider = request.provider, context = request.context, requestIdentity] in
             let suggestions = await provider.suggestions(for: context)
             guard !Task.isCancelled else {
                 return
@@ -324,7 +329,7 @@ extension BlockInputView {
                     return
                 }
                 guard var current = completionSession,
-                      current.id == sessionID else {
+                      current.requestIdentity == requestIdentity else {
                     return
                 }
                 guard let currentBlock = block(withID: current.blockID),
@@ -356,6 +361,7 @@ extension BlockInputView {
         completionPopupView = popup
         presentCompletionPopup(popup, for: session, state: completionPopupState(for: session))
         installCompletionPopupDismissalMonitor()
+        publishEditorInteractionUIChangeIfNeeded()
         updateInlineHintsForVisibleItems()
     }
 

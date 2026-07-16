@@ -43,6 +43,7 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.completionReturnBehavior, .acceptHighlightedSuggestion)
         XCTAssertEqual(configuration.slashCommandAvailability, .documentStart)
         XCTAssertNil(configuration.slashCommandChipClickHandler)
+        XCTAssertNil(configuration.onEditorInteractionUIChange)
     }
 
     @MainActor
@@ -156,6 +157,15 @@ final class BlockInputConfigurationTests: XCTestCase {
         XCTAssertNotNil(view.onDocumentChange)
         XCTAssertEqual(view.documentChangeSnapshotDelay, 0.01)
         XCTAssertNotNil(view.onFocusChange)
+    }
+
+    @MainActor
+    func testViewAppliesEditorInteractionUICallback() {
+        let view = BlockInputView()
+
+        view.configure(BlockInputConfiguration(onEditorInteractionUIChange: { _ in }))
+
+        XCTAssertNotNil(view.onEditorInteractionUIChange)
     }
 
     @MainActor

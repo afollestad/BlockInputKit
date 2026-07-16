@@ -65,15 +65,17 @@ extension BlockInputView {
         guard isEditable else {
             return
         }
-        dismissLinkModal(restoreFocus: false)
-        dismissCompletionPopup()
-        let modal = imageModalView ?? BlockInputImageModalView()
-        modal.configure(urlString: source ?? "", altText: altText ?? "")
-        configureImageModalActions(modal, context: context)
-        imageModalView = modal
-        imageModalContext = context
-        hostMutationModal(modal, kind: .image, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
-        modal.focusInitialField()
+        performEditorInteractionUIChanges {
+            dismissLinkModal(restoreFocus: false)
+            dismissCompletionPopup()
+            let modal = imageModalView ?? BlockInputImageModalView()
+            modal.configure(urlString: source ?? "", altText: altText ?? "")
+            configureImageModalActions(modal, context: context)
+            imageModalView = modal
+            imageModalContext = context
+            hostMutationModal(modal, kind: .image, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
+            modal.focusInitialField()
+        }
     }
 
     func dismissImageModal(restoreFocus: Bool) {
@@ -81,6 +83,7 @@ extension BlockInputView {
         imageModalView?.removeFromSuperview()
         imageModalView = nil
         imageModalContext = nil
+        publishEditorInteractionUIChangeIfNeeded()
         guard restoreFocus,
               let context else {
             return

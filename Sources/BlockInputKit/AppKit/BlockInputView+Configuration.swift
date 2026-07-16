@@ -108,6 +108,7 @@ extension BlockInputView {
         documentChangeSnapshotDelay = configuration.documentChangeSnapshotDelay
         onSelectionChange = configuration.onSelectionChange
         onFocusChange = configuration.onFocusChange
+        onEditorInteractionUIChange = configuration.onEditorInteractionUIChange
         fileDropHandler = configuration.fileDropHandler
         linkURLOpener = configuration.urlOpener
         modalOverlayProvider = configuration.modalOverlayProvider

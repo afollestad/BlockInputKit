@@ -5,6 +5,7 @@ extension BlockInputView {
         super.viewWillMove(toWindow: newWindow)
         if newWindow == nil {
             invalidateProvisionalTextReplacement()
+            dismissCompletionPopup()
             dismissLinkModal(restoreFocus: false)
             dismissImageModal(restoreFocus: false)
         }

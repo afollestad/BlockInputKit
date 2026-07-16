@@ -416,6 +416,12 @@ let configuration = BlockInputConfiguration(
 The provider receives the modal kind, default editor-owned frame, measured modal size, and source anchor. Return the
 modal parent view plus a frame in that parent's coordinate space.
 
+Hosts that need to defer app-level interactions while editor-owned transient UI is active can inspect
+`BlockInputView.hasPresentedEditorInteractionUI`. It remains `true` while a completion popup, including its loading
+state, or a link/image modal is presented. Configure `onEditorInteractionUIChange` when the host also needs live
+aggregate transition notifications; repeated popup refreshes and modal-to-modal handoffs do not publish duplicate
+values.
+
 ### File Mentions
 
 For file mentions in paragraphs or headings, return a file-link suggestion:

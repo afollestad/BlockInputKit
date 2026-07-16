@@ -145,32 +145,34 @@ extension BlockInputView {
     /// Presents the single editor-owned link modal and binds its actions to the captured source context.
     func showLinkModal(context: BlockInputLinkContext, text prefilledText: String? = nil, urlString prefilledURLString: String? = nil) {
         guard isEditable, let block = block(withID: context.blockID) else { return }
-        dismissImageModal(restoreFocus: false)
-        dismissCompletionPopup()
-        removeLinkModalDismissalMonitors()
-        let modal = linkModalView ?? BlockInputLinkModalView()
-        let mode: BlockInputLinkModalMode
-        let text: String
-        let urlString: String
-        switch context.mode {
-        case .create(let range):
-            mode = .create
-            text = prefilledText ?? (range.length > 0 ? linkCreationText(in: block, range: range) : "")
-            urlString = prefilledURLString ?? ""
-        case .edit(let linkRange):
-            mode = .edit
-            text = prefilledText ?? linkText(in: block, range: linkRange)
-            urlString = prefilledURLString ?? linkRange.linkRawDestination ?? linkRange.linkDestination?.absoluteString ?? ""
+        performEditorInteractionUIChanges {
+            dismissImageModal(restoreFocus: false)
+            dismissCompletionPopup()
+            removeLinkModalDismissalMonitors()
+            let modal = linkModalView ?? BlockInputLinkModalView()
+            let mode: BlockInputLinkModalMode
+            let text: String
+            let urlString: String
+            switch context.mode {
+            case .create(let range):
+                mode = .create
+                text = prefilledText ?? (range.length > 0 ? linkCreationText(in: block, range: range) : "")
+                urlString = prefilledURLString ?? ""
+            case .edit(let linkRange):
+                mode = .edit
+                text = prefilledText ?? linkText(in: block, range: linkRange)
+                urlString = prefilledURLString ?? linkRange.linkRawDestination ?? linkRange.linkDestination?.absoluteString ?? ""
+            }
+            modal.fileBaseURL = fileBaseURL
+            modal.configure(mode: mode, text: text, urlString: urlString)
+            configureLinkModalActions(modal, context: context, mode: mode)
+            linkModalView = modal
+            linkModalContext = context
+            linkModalRetargetMouseDownWindowLocation = nil
+            hostMutationModal(modal, kind: .link, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
+            installLinkModalDismissalMonitors()
+            modal.focusInitialField()
         }
-        modal.fileBaseURL = fileBaseURL
-        modal.configure(mode: mode, text: text, urlString: urlString)
-        configureLinkModalActions(modal, context: context, mode: mode)
-        linkModalView = modal
-        linkModalContext = context
-        linkModalRetargetMouseDownWindowLocation = nil
-        hostMutationModal(modal, kind: .link, anchoredTo: context.anchorWindowRect, minimumSize: NSSize(width: 300, height: 148))
-        installLinkModalDismissalMonitors()
-        modal.focusInitialField()
     }
 
     private func configureLinkModalActions(
@@ -223,6 +225,7 @@ extension BlockInputView {
         linkModalView = nil
         linkModalContext = nil
         linkModalRetargetMouseDownWindowLocation = nil
+        publishEditorInteractionUIChangeIfNeeded()
         guard restoreFocus,
               let context,
               let block = block(withID: context.blockID) else {

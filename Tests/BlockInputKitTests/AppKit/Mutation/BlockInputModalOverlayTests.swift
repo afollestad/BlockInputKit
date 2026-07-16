@@ -4,6 +4,24 @@ import XCTest
 
 @MainActor
 final class BlockInputModalOverlayTests: XCTestCase {
+    func testPresentedEditorInteractionUITracksLinkAndImageModals() {
+        let mounted = makeHostedEditor()
+
+        XCTAssertFalse(mounted.view.hasPresentedEditorInteractionUI)
+
+        mounted.view.showLinkModal(context: linkContext(in: mounted))
+        XCTAssertTrue(mounted.view.hasPresentedEditorInteractionUI)
+
+        mounted.view.dismissLinkModal(restoreFocus: false)
+        XCTAssertFalse(mounted.view.hasPresentedEditorInteractionUI)
+
+        mounted.view.showImageModal(context: imageContext(in: mounted))
+        XCTAssertTrue(mounted.view.hasPresentedEditorInteractionUI)
+
+        mounted.view.dismissImageModal(restoreFocus: false)
+        XCTAssertFalse(mounted.view.hasPresentedEditorInteractionUI)
+    }
+
     func testLinkModalOverlayProviderControlsContainerAndFrame() throws {
         let customFrame = NSRect(x: 24, y: 30, width: 312, height: 156)
         var capturedKind: BlockInputModalKind?
