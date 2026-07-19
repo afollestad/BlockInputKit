@@ -88,6 +88,7 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         )
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
         let contentOffset = contentLocation("/table", in: text)
+        let finalContentOffset = NSMaxRange((text as NSString).range(of: "/table")) - 1
         let openingBracketOffset = (text as NSString).range(of: "[").location
         let trailingSpaceOffset = (text as NSString).range(of: ") today").location + 1
 
@@ -99,7 +100,8 @@ final class BlockInputBlockItemInlineChipTests: XCTestCase {
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: contentOffset, effectiveRange: nil) as? NSColor, .labelColor)
         XCTAssertTrue(try font(at: contentOffset, in: textStorage).isFixedPitch)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: openingBracketOffset, effectiveRange: nil) as? NSColor, .clear)
-        XCTAssertEqual(textStorage.attribute(.kern, at: trailingSpaceOffset, effectiveRange: nil) as? CGFloat, 5)
+        XCTAssertNil(textStorage.attribute(.kern, at: finalContentOffset, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.kern, at: trailingSpaceOffset, effectiveRange: nil))
     }
 
     func testRawSlashCommandRendersAsVisualOnlyChipWhenEnabled() throws {

@@ -53,7 +53,8 @@ public struct BlockInputSlashCommandArgumentHints: Sendable {
               !hint.isEmpty else {
             return nil
         }
-        return BlockInputInlineHint(text: parsedCommand.trailingText.isEmpty ? " \(hint)" : hint)
+        let isBareCommand = parsedCommand.trailingText.isEmpty
+        return BlockInputInlineHint(text: isBareCommand ? " \(hint)" : hint)
     }
 
     private static func normalizedHints(from commandHints: [(command: String, hint: String)]) -> [String: String] {

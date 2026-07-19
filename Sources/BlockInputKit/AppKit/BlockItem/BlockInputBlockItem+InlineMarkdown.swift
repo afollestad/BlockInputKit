@@ -39,9 +39,8 @@ extension BlockInputBlockItem {
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
-            let inlineChipStyle = markdownRange
-                .inlineChipKind(in: textStorage.string)
-                .map { style.inlineChipStyle(for: $0) }
+            let inlineChipKind = markdownRange.inlineChipKind(in: textStorage.string)
+            let inlineChipStyle = inlineChipKind.map { style.inlineChipStyle(for: $0) }
             Self.applyInlineMarkdownContentAttributes(
                 for: markdownRange,
                 excluding: inlineCodeRanges,
@@ -64,8 +63,12 @@ extension BlockInputBlockItem {
                     range: clampedDelimiterRange
                 )
             }
-            if inlineChipStyle != nil {
-                Self.applyInlineChipAdjacentWhitespaceSpacers(for: markdownRange, in: textStorage)
+            if let inlineChipKind {
+                Self.applyInlineChipSpacing(
+                    for: markdownRange,
+                    kind: inlineChipKind,
+                    in: textStorage
+                )
             }
         }
     }
@@ -180,26 +183,45 @@ extension BlockInputBlockItem {
         max(0, ceil(baseFont.ascender - chipFont.ascender))
     }
 
-    private static func applyInlineChipAdjacentWhitespaceSpacers(
+    private static func applyInlineChipSpacing(
         for markdownRange: BlockInputInlineMarkdownRange,
+        kind: BlockInputInlineChipKind,
         in textStorage: NSTextStorage
     ) {
         let text = textStorage.string as NSString
-        [
-            markdownRange.fullRange.location - 1,
-            NSMaxRange(markdownRange.fullRange)
-        ].forEach { location in
-            guard location >= 0,
-                  location < text.length,
-                  Self.isInlineChipAdjacentSpacerCharacter(text.character(at: location)) else {
-                return
-            }
-            textStorage.addAttribute(
-                .kern,
-                value: inlineChipAdjacentWhitespaceKern,
-                range: NSRange(location: location, length: 1)
+        applyInlineChipWhitespaceSpacing(
+            at: markdownRange.fullRange.location - 1,
+            text: text,
+            textStorage: textStorage
+        )
+
+        switch kind {
+        case .fileLink:
+            applyInlineChipWhitespaceSpacing(
+                at: NSMaxRange(markdownRange.fullRange),
+                text: text,
+                textStorage: textStorage
             )
+        case .slashCommand, .rawSlashCommand:
+            break
         }
+    }
+
+    private static func applyInlineChipWhitespaceSpacing(
+        at location: Int,
+        text: NSString,
+        textStorage: NSTextStorage
+    ) {
+        guard location >= 0,
+              location < text.length,
+              Self.isInlineChipAdjacentSpacerCharacter(text.character(at: location)) else {
+            return
+        }
+        textStorage.addAttribute(
+            .kern,
+            value: inlineChipAdjacentWhitespaceKern,
+            range: NSRange(location: location, length: 1)
+        )
     }
 
     private static func isInlineChipAdjacentSpacerCharacter(_ character: unichar) -> Bool {

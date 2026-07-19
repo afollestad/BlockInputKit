@@ -6,17 +6,15 @@ extension BlockInputBlockItem {
         textWidth: CGFloat,
         style: BlockInputStyle = .default,
         fileBaseURL: URL? = nil,
+        rawSlashCommandChips: Bool = false,
+        slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
+        isDocumentStartBlock: Bool = false,
         blockVerticalInsetMultiplier: CGFloat = 1
     ) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
         let font = font(for: block.kind, style: style)
         let metrics = verticalMetrics(for: block, blockVerticalInsetMultiplier: blockVerticalInsetMultiplier)
-        let hiddenDelimiterRanges = hiddenInlineDelimiterRanges(for: block, text: text, fileBaseURL: fileBaseURL)
-        let inlineCodeRanges = inlineCodeRangesForHeight(for: block, text: text)
-        let frontMatterReserve = block.kind == .frontMatter
-            ? (scaledFrontMatterDividerVerticalInset(for: blockVerticalInsetMultiplier) * 2) + frontMatterDividerHeight
-            : 0
         if block.kind == .table,
            let table = BlockInputTable(markdown: block.text) {
             return max(
@@ -41,16 +39,67 @@ extension BlockInputBlockItem {
         if case .code = block.kind {
             return codeBlockHeight(text: text, availableTextWidth: availableTextWidth, font: font, metrics: metrics)
         }
-        return textBlockHeight(BlockInputTextHeightContext(
+        let textConfiguration = BlockInputTextHeightConfiguration(
+            style: style,
+            fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock,
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+        )
+        return textBlockHeight(textHeightContext(
+            for: block,
+            text: text,
+            availableTextWidth: availableTextWidth,
+            font: font,
+            metrics: metrics,
+            configuration: textConfiguration
+        ))
+    }
+
+    private static func textHeightContext(
+        for block: BlockInputBlock,
+        text: String,
+        availableTextWidth: CGFloat,
+        font: NSFont,
+        metrics: BlockInputBlockItemVerticalMetrics,
+        configuration: BlockInputTextHeightConfiguration
+    ) -> BlockInputTextHeightContext {
+        let inlineCodeRanges = inlineCodeRangesForHeight(for: block, text: text)
+        let inlineMarkdownRanges = inlineMarkdownRangesForHeight(
+            for: block,
+            text: text,
+            inlineCodeRanges: inlineCodeRanges,
+            fileBaseURL: configuration.fileBaseURL,
+            rawSlashCommandChips: configuration.rawSlashCommandChips,
+            slashCommandAvailability: configuration.slashCommandAvailability,
+            isDocumentStartBlock: configuration.isDocumentStartBlock
+        )
+        let hiddenDelimiterRanges = (
+            inlineCodeRanges.flatMap(\.delimiterRanges)
+                + inlineMarkdownRanges.flatMap(\.delimiterRanges)
+        ).sorted { first, second in
+            first.location < second.location
+        }
+        let frontMatterReserve = block.kind == .frontMatter
+            ? (scaledFrontMatterDividerVerticalInset(for: configuration.blockVerticalInsetMultiplier) * 2) + frontMatterDividerHeight
+            : 0
+        return BlockInputTextHeightContext(
             text: text,
             availableTextWidth: availableTextWidth,
             font: font,
             metrics: metrics,
             hiddenDelimiterRanges: hiddenDelimiterRanges,
             inlineCodeRanges: inlineCodeRanges,
+            containsInlineChip: inlineMarkdownRanges.contains { $0.inlineChipKind(in: text) != nil },
             frontMatterReserve: frontMatterReserve,
-            style: style
-        ))
+            style: configuration.style,
+            block: block,
+            fileBaseURL: configuration.fileBaseURL,
+            rawSlashCommandChips: configuration.rawSlashCommandChips,
+            slashCommandAvailability: configuration.slashCommandAvailability,
+            isDocumentStartBlock: configuration.isDocumentStartBlock
+        )
     }
 
     private static func codeBlockHeight(
@@ -73,6 +122,7 @@ extension BlockInputBlockItem {
 
     private static func textBlockHeight(_ context: BlockInputTextHeightContext) -> CGFloat {
         if context.inlineCodeRanges.isEmpty,
+           !context.containsInlineChip,
            isShortSingleLine(context.text, likelyFitting: context.availableTextWidth, font: context.font) {
             return max(
                 context.metrics.minimumHeight + context.frontMatterReserve,
@@ -94,7 +144,14 @@ extension BlockInputBlockItem {
             font: context.font,
             hiddenDelimiterRanges: context.hiddenDelimiterRanges,
             inlineCodeRanges: context.inlineCodeRanges,
-            style: context.style
+            style: context.style,
+            inlineChipMeasurement: context.containsInlineChip ? BlockInputInlineChipHeightMeasurement(
+                block: context.block,
+                fileBaseURL: context.fileBaseURL,
+                rawSlashCommandChips: context.rawSlashCommandChips,
+                slashCommandAvailability: context.slashCommandAvailability,
+                isDocumentStartBlock: context.isDocumentStartBlock
+            ) : nil
         )
         let measuredTextHeight = context.hiddenDelimiterRanges.isEmpty
             ? max(ceil(boundingRect.height), textKitHeight)
@@ -135,7 +192,8 @@ extension BlockInputBlockItem {
         font: NSFont,
         hiddenDelimiterRanges: [NSRange] = [],
         inlineCodeRanges: [BlockInputInlineCodeRange] = [],
-        style: BlockInputStyle = .default
+        style: BlockInputStyle = .default,
+        inlineChipMeasurement: BlockInputInlineChipHeightMeasurement? = nil
     ) -> CGFloat {
         let textStorage = NSTextStorage(string: text, attributes: [.font: font])
         let layoutManager = NSLayoutManager()
@@ -154,6 +212,17 @@ extension BlockInputBlockItem {
             textStorage: textStorage,
             fullRange: fullRange
         )
+        if let inlineChipMeasurement {
+            applyInlineMarkdownAttributes(
+                for: inlineChipMeasurement.block,
+                textStorage: textStorage,
+                style: style,
+                fileBaseURL: inlineChipMeasurement.fileBaseURL,
+                rawSlashCommandChips: inlineChipMeasurement.rawSlashCommandChips,
+                slashCommandAvailability: inlineChipMeasurement.slashCommandAvailability,
+                isDocumentStartBlock: inlineChipMeasurement.isDocumentStartBlock
+            )
+        }
         for delimiterRange in hiddenDelimiterRanges {
             let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
             guard clampedDelimiterRange.length > 0 else {
@@ -202,30 +271,26 @@ extension BlockInputBlockItem {
         }
     }
 
-    private static func hiddenInlineDelimiterRanges(
+    private static func inlineMarkdownRangesForHeight(
         for block: BlockInputBlock,
         text: String,
-        fileBaseURL: URL? = nil
-    ) -> [NSRange] {
-        switch block.kind {
-        case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem:
-            let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text)
-            let inlineCodeFullRanges = inlineCodeRanges.map(\.fullRange)
-            let inlineMarkdownRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
-                in: text,
-                excluding: inlineCodeFullRanges,
-                fileBaseURL: fileBaseURL
-            )
-            return (
-                inlineCodeRanges.flatMap(\.delimiterRanges)
-                    + inlineMarkdownRanges.flatMap(\.delimiterRanges)
-            )
-            .sorted { first, second in
-                first.location < second.location
-            }
-        case .code, .horizontalRule, .frontMatter, .table, .image, .rawMarkdown:
+        inlineCodeRanges: [BlockInputInlineCodeRange],
+        fileBaseURL: URL?,
+        rawSlashCommandChips: Bool,
+        slashCommandAvailability: BlockInputSlashCommandAvailability,
+        isDocumentStartBlock: Bool
+    ) -> [BlockInputInlineMarkdownRange] {
+        guard supportsInlineMarkdownStyling(block.kind) else {
             return []
         }
+        return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: text,
+            excluding: inlineCodeRanges.map(\.fullRange),
+            fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock
+        )
     }
 
     private static func unwrappedTextWidth(for text: String, font: NSFont) -> CGFloat {
@@ -245,6 +310,29 @@ private struct BlockInputTextHeightContext {
     var metrics: BlockInputBlockItemVerticalMetrics
     var hiddenDelimiterRanges: [NSRange]
     var inlineCodeRanges: [BlockInputInlineCodeRange]
+    var containsInlineChip: Bool
     var frontMatterReserve: CGFloat
     var style: BlockInputStyle
+    var block: BlockInputBlock
+    var fileBaseURL: URL?
+    var rawSlashCommandChips: Bool
+    var slashCommandAvailability: BlockInputSlashCommandAvailability
+    var isDocumentStartBlock: Bool
+}
+
+private struct BlockInputInlineChipHeightMeasurement {
+    var block: BlockInputBlock
+    var fileBaseURL: URL?
+    var rawSlashCommandChips: Bool
+    var slashCommandAvailability: BlockInputSlashCommandAvailability
+    var isDocumentStartBlock: Bool
+}
+
+private struct BlockInputTextHeightConfiguration {
+    var style: BlockInputStyle
+    var fileBaseURL: URL?
+    var rawSlashCommandChips: Bool
+    var slashCommandAvailability: BlockInputSlashCommandAvailability
+    var isDocumentStartBlock: Bool
+    var blockVerticalInsetMultiplier: CGFloat
 }

@@ -70,6 +70,115 @@ final class BlockInputViewInlineHintTests: XCTestCase {
         XCTAssertFalse(updatedItem.testingInlineHintView.isHidden)
     }
 
+    func testSlashCommandHintGlyphAlignsAcrossSingleVirtualLiteralAndTypedSpaces() throws {
+        let styles = [
+            BlockInputStyle.default,
+            BlockInputStyle(baseText: BlockInputTextStyle(font: .systemFont(ofSize: 17, weight: .semibold)))
+        ]
+        let cases = [
+            SlashHintGeometryCase(
+                bareText: "/review",
+                spacedText: "/review ",
+                argumentText: "/review x",
+                rawSlashCommandChips: true
+            ),
+            SlashHintGeometryCase(
+                bareText: "[/review](demo://review)",
+                spacedText: "[/review](demo://review) ",
+                argumentText: "[/review](demo://review) x",
+                rawSlashCommandChips: false
+            )
+        ]
+
+        for style in styles {
+            for testCase in cases {
+                try assertSlashHintGeometry(testCase, style: style)
+            }
+        }
+    }
+
+    func testPartialRawSlashCommandDoesNotReserveHintSpacing() throws {
+        let text = "/effo"
+        let argumentHints = BlockInputSlashCommandArgumentHints(["effort": "low|medium|high"])
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "command", text: text)
+            ]),
+            inlineHintProvider: { argumentHints.inlineHint(for: $0) },
+            rawSlashCommandChips: true
+        ))
+
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        mounted.view.updateInlineHintsForVisibleItems()
+
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+        XCTAssertTrue(item.testingInlineHintView.isHidden)
+        XCTAssertNil(textStorage.attribute(.kern, at: textStorage.length - 1, effectiveRange: nil))
+    }
+
+    func testBareRawSlashCommandHintDoesNotMoveCaretOrMutateTextSpacing() throws {
+        let text = "/effort"
+        let hintState = InlineHintVisibilityState()
+        let argumentHints = BlockInputSlashCommandArgumentHints(["effort": "low|medium|high"])
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "command", text: text)
+            ]),
+            inlineHintProvider: { context in
+                hintState.returnsHint ? argumentHints.inlineHint(for: context) : nil
+            },
+            rawSlashCommandChips: true
+        ))
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+
+        XCTAssertNil(textStorage.attribute(.kern, at: textStorage.length - 1, effectiveRange: nil))
+
+        hintState.returnsHint = true
+        mounted.view.updateInlineHintsForVisibleItems()
+
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textContainerX = try XCTUnwrap(item.textContainerX(forUTF16Offset: (text as NSString).length))
+        let caretX = textView.textContainerOrigin.x + textContainerX
+        XCTAssertFalse(item.testingInlineHintView.isHidden)
+        XCTAssertNil(textStorage.attribute(.kern, at: textStorage.length - 1, effectiveRange: nil))
+        XCTAssertEqual(
+            item.testingInlineHintView.frame.minX,
+            caretX,
+            accuracy: 1
+        )
+
+        hintState.returnsHint = false
+        mounted.view.updateInlineHintsForVisibleItems()
+
+        XCTAssertTrue(item.testingInlineHintView.isHidden)
+        XCTAssertNil(textStorage.attribute(.kern, at: textStorage.length - 1, effectiveRange: nil))
+    }
+
+    func testTypingAndUndoingSlashCommandSpaceOnlyMutatesLiteralDocumentText() throws {
+        let text = "/review"
+        let mounted = makeSlashHintView(text: text, rawSlashCommandChips: true)
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        XCTAssertEqual(mounted.view.document.markdown, text)
+        XCTAssertEqual(textView.accessibilityValue(), text)
+        XCTAssertEqual(item.testingInlineHintView.text, " hint")
+
+        textView.insertText(" ", replacementRange: textView.selectedRange())
+
+        XCTAssertEqual(mounted.view.document.markdown, "\(text) ")
+        XCTAssertEqual(textView.accessibilityValue(), "\(text) ")
+        XCTAssertEqual(item.testingInlineHintView.text, "hint")
+        XCTAssertTrue(textView.performKeyEquivalent(with: try commandZEvent()))
+        XCTAssertEqual(mounted.view.document.markdown, text)
+        XCTAssertEqual(textView.accessibilityValue(), text)
+        XCTAssertEqual(item.testingInlineHintView.text, " hint")
+    }
+
     func testInlineHintHidesForNilProviderNonCollapsedSelectionReadOnlyAndUnsupportedBlocks() throws {
         try assertHintHidden(
             blocks: [BlockInputBlock(id: "plain", text: "/command")],
@@ -201,4 +310,142 @@ final class BlockInputViewInlineHintTests: XCTestCase {
 
         XCTAssertTrue(item.testingInlineHintView.isHidden, file: file, line: line)
     }
+
+    private func assertSlashHintGeometry(
+        _ testCase: SlashHintGeometryCase,
+        style: BlockInputStyle
+    ) throws {
+        let bare = try slashHintGeometry(
+            text: testCase.bareText,
+            rawSlashCommandChips: testCase.rawSlashCommandChips,
+            style: style
+        )
+        let spaced = try slashHintGeometry(
+            text: testCase.spacedText,
+            rawSlashCommandChips: testCase.rawSlashCommandChips,
+            style: style
+        )
+        let argumentX = try slashArgumentX(
+            text: testCase.argumentText,
+            rawSlashCommandChips: testCase.rawSlashCommandChips,
+            style: style
+        )
+        let unhintedCaretX = try slashCaretXWithoutHint(
+            text: testCase.bareText,
+            rawSlashCommandChips: testCase.rawSlashCommandChips,
+            style: style
+        )
+
+        XCTAssertEqual(bare.caretX, unhintedCaretX, accuracy: 1, testCase.bareText)
+        XCTAssertEqual(bare.hintFrameX, bare.caretX, accuracy: 1, testCase.bareText)
+        XCTAssertEqual(spaced.hintFrameX, spaced.caretX, accuracy: 1, testCase.spacedText)
+        XCTAssertEqual(spaced.trailingSpaceFont, bare.hintFont, testCase.spacedText)
+        XCTAssertEqual(bare.virtualSpaceWidth, spaced.caretX - bare.caretX, accuracy: 0.01, testCase.bareText)
+        XCTAssertEqual(bare.visibleHintGlyphX, spaced.visibleHintGlyphX, accuracy: 1, testCase.bareText)
+        XCTAssertEqual(spaced.visibleHintGlyphX, argumentX, accuracy: 1, testCase.spacedText)
+        XCTAssertEqual(bare.hintText, " hint")
+        XCTAssertEqual(spaced.hintText, "hint")
+    }
+
+    private func slashHintGeometry(
+        text: String,
+        rawSlashCommandChips: Bool,
+        style: BlockInputStyle = .default
+    ) throws -> SlashHintGeometry {
+        let mounted = makeSlashHintView(text: text, rawSlashCommandChips: rawSlashCommandChips, style: style)
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let hintView = item.testingInlineHintView
+        let textContainerX = try XCTUnwrap(item.textContainerX(forUTF16Offset: (text as NSString).length))
+        let leadingSpaceWidth = hintView.text.hasPrefix(" ")
+            ? (" " as NSString).size(withAttributes: [.font: hintView.font]).width
+            : 0
+        let trailingSpaceFont = text.last?.isWhitespace == true
+            ? textView.textStorage?.attribute(.font, at: (text as NSString).length - 1, effectiveRange: nil) as? NSFont
+            : nil
+
+        XCTAssertFalse(hintView.isHidden)
+        return SlashHintGeometry(
+            caretX: textView.textContainerOrigin.x + textContainerX,
+            hintFrameX: hintView.frame.minX,
+            virtualSpaceWidth: leadingSpaceWidth,
+            visibleHintGlyphX: hintView.frame.minX + leadingSpaceWidth,
+            hintText: hintView.text,
+            hintFont: hintView.font,
+            trailingSpaceFont: trailingSpaceFont
+        )
+    }
+
+    private func slashArgumentX(
+        text: String,
+        rawSlashCommandChips: Bool,
+        style: BlockInputStyle = .default
+    ) throws -> CGFloat {
+        let mounted = makeSlashHintView(text: text, rawSlashCommandChips: rawSlashCommandChips, style: style)
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let argumentOffset = (text as NSString).range(of: "x", options: .backwards).location
+        let textContainerX = try XCTUnwrap(item.textContainerX(forUTF16Offset: argumentOffset))
+
+        return textView.textContainerOrigin.x + textContainerX
+    }
+
+    private func slashCaretXWithoutHint(
+        text: String,
+        rawSlashCommandChips: Bool,
+        style: BlockInputStyle = .default
+    ) throws -> CGFloat {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "command", text: text)
+            ]),
+            rawSlashCommandChips: rawSlashCommandChips,
+            style: style
+        ))
+        mounted.view.focus(blockID: "command", utf16Offset: (text as NSString).length)
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textContainerX = try XCTUnwrap(item.textContainerX(forUTF16Offset: (text as NSString).length))
+        return textView.textContainerOrigin.x + textContainerX
+    }
+
+    private func makeSlashHintView(
+        text: String,
+        rawSlashCommandChips: Bool,
+        style: BlockInputStyle = .default
+    ) -> (view: BlockInputView, window: NSWindow) {
+        let argumentHints = BlockInputSlashCommandArgumentHints(["review": "hint"])
+        return makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "command", text: text)
+            ]),
+            inlineHintProvider: { argumentHints.inlineHint(for: $0) },
+            rawSlashCommandChips: rawSlashCommandChips,
+            style: style
+        ))
+    }
+}
+
+private struct SlashHintGeometryCase {
+    var bareText: String
+    var spacedText: String
+    var argumentText: String
+    var rawSlashCommandChips: Bool
+}
+
+private struct SlashHintGeometry {
+    var caretX: CGFloat
+    var hintFrameX: CGFloat
+    var virtualSpaceWidth: CGFloat
+    var visibleHintGlyphX: CGFloat
+    var hintText: String
+    var hintFont: NSFont
+    var trailingSpaceFont: NSFont?
+}
+
+@MainActor
+private final class InlineHintVisibilityState {
+    var returnsHint = false
 }

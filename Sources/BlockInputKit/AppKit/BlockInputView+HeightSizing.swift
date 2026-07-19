@@ -217,6 +217,9 @@ extension BlockInputView {
                 textWidth: textWidth,
                 style: style,
                 fileBaseURL: fileBaseURL,
+                rawSlashCommandChips: rawSlashCommandChips,
+                slashCommandAvailability: slashCommandAvailability,
+                isDocumentStartBlock: index == 0,
                 blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
             )
             if let maximumHeight, height >= maximumHeight {

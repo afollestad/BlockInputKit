@@ -28,6 +28,56 @@ final class BlockInputBlockItemHeightTests: XCTestCase {
     }
 
     @MainActor
+    func testHeightMeasurementMatchesMountedSlashCommandChipMetricsNearWrapBoundary() throws {
+        try assertSlashCommandHeightParity(
+            text: "/review-github-pr ",
+            rawSlashCommandChips: true
+        )
+        try assertSlashCommandHeightParity(
+            text: "[/review-github-pr](host-app://commands/review-github-pr) ",
+            rawSlashCommandChips: false
+        )
+    }
+
+    @MainActor
+    private func assertSlashCommandHeightParity(
+        text: String,
+        rawSlashCommandChips: Bool
+    ) throws {
+        let block = BlockInputBlock(kind: .paragraph, text: text)
+        let narrowWidth: CGFloat = 120
+        let measuredHeight = BlockInputBlockItem.height(
+            for: block,
+            textWidth: narrowWidth,
+            rawSlashCommandChips: rawSlashCommandChips,
+            isDocumentStartBlock: true
+        )
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: block,
+            allowsReordering: false,
+            rawSlashCommandChips: rawSlashCommandChips,
+            isDocumentStartBlock: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        let textContainer = try XCTUnwrap(textView.textContainer)
+        let layoutManager = try XCTUnwrap(textView.layoutManager)
+        textContainer.widthTracksTextView = false
+        textContainer.containerSize.width = narrowWidth
+        textContainer.lineFragmentPadding = 0
+        layoutManager.invalidateLayout(
+            forCharacterRange: NSRange(location: 0, length: (textView.string as NSString).length),
+            actualCharacterRange: nil
+        )
+        layoutManager.ensureLayout(for: textContainer)
+        let renderedTextHeight = ceil(layoutManager.usedRect(for: textContainer).height)
+        let requiredRowHeight = renderedTextHeight + (textView.textContainerInset.height * 2) + 2
+
+        XCTAssertGreaterThan(renderedTextHeight, 20)
+        XCTAssertGreaterThanOrEqual(measuredHeight, requiredRowHeight, text)
+    }
+
+    @MainActor
     func testListHeightAccountsForIndentedTextWidth() {
         let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")
         let itemWidth: CGFloat = 260

@@ -486,7 +486,10 @@ BlockInputCompletionSuggestion.slashCommand(
 ```
 
 Raw slash chips are visual only. They keep editing, selection, copy, accessibility text, and Markdown export behavior as
-normal text. Link-backed slash chips and `slashCommandChipClickHandler` routing are unchanged.
+normal text. Raw and link-backed slash chips leave following document whitespace at its normal font advance. Bare
+argument hints prepend one literal ASCII space, so virtual and typed separators use the same glyph metrics without an
+extra measurement or document mutation. Showing a hint does not move the document caret, and link-backed slash chips and
+`slashCommandChipClickHandler` routing are otherwise unchanged.
 
 ### Inline Argument Hints
 
@@ -506,7 +509,11 @@ let configuration = BlockInputConfiguration(
 ```
 
 The provider only runs for a focused, editable, inline-Markdown-capable block with a valid collapsed selection.
-`BlockInputSlashCommandArgumentHints` supports raw `/command` text and link-backed slash command chips.
+`BlockInputSlashCommandArgumentHints` supports raw `/command` text and link-backed slash command chips. A bare command
+uses a virtual leading ASCII space in the hint; once the document contains whitespace after the command, the hint omits
+that virtual separator and follows the document's actual whitespace geometry. This makes the normal transition from no
+separator to one typed ASCII space use the same glyph metrics. Neither form mutates the document, and showing or hiding
+a bare hint does not move the caret.
 
 ## File Drops
 

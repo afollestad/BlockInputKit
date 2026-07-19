@@ -63,7 +63,11 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         guard let block = block(at: indexPath.item) else {
             return NSSize(width: availableWidth, height: 32)
         }
-        return NSSize(width: availableWidth, height: measuredBlockItemHeight(for: block, itemWidth: availableWidth))
+        return NSSize(width: availableWidth, height: measuredBlockItemHeight(
+            for: block,
+            itemWidth: availableWidth,
+            isDocumentStartBlock: indexPath.item == 0
+        ))
     }
 }
 

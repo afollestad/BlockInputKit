@@ -1,7 +1,11 @@
 import AppKit
 
 extension BlockInputView {
-    func measuredBlockItemHeight(for block: BlockInputBlock, itemWidth: CGFloat) -> CGFloat {
+    func measuredBlockItemHeight(
+        for block: BlockInputBlock,
+        itemWidth: CGFloat,
+        isDocumentStartBlock: Bool
+    ) -> CGFloat {
         let textWidth = BlockInputBlockItem.measuredTextWidth(
             for: itemWidth,
             block: block,
@@ -14,6 +18,9 @@ extension BlockInputView {
             textWidth: textWidth,
             style: style,
             fileBaseURL: fileBaseURL,
+            rawSlashCommandChips: rawSlashCommandChips,
+            slashCommandAvailability: slashCommandAvailability,
+            isDocumentStartBlock: isDocumentStartBlock,
             blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
         )
     }

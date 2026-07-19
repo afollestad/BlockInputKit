@@ -6,14 +6,17 @@ import XCTest
 final class BlockInputSlashCommandArgumentHintsTests: XCTestCase {
     func testRawSlashCommandUsesLeadingSpaceBeforeArgumentStart() {
         let hints = BlockInputSlashCommandArgumentHints(["review-github-pr": "[PR URL]"])
+        let hint = hints.inlineHint(for: context(text: "/review-github-pr"))
 
-        XCTAssertEqual(hints.inlineHint(for: context(text: "/review-github-pr"))?.text, " [PR URL]")
+        XCTAssertEqual(hint?.text, " [PR URL]")
+        XCTAssertEqual(hint, BlockInputInlineHint(text: " [PR URL]"))
     }
 
     func testRawSlashCommandWithTrailingSpaceUsesBareHint() {
         let hints = BlockInputSlashCommandArgumentHints(["review-github-pr": "[PR URL]"])
+        let hint = hints.inlineHint(for: context(text: "/review-github-pr "))
 
-        XCTAssertEqual(hints.inlineHint(for: context(text: "/review-github-pr "))?.text, "[PR URL]")
+        XCTAssertEqual(hint?.text, "[PR URL]")
     }
 
     func testLinkBackedSlashCommandUsesHint() {
@@ -22,6 +25,14 @@ final class BlockInputSlashCommandArgumentHintsTests: XCTestCase {
         let hint = hints.inlineHint(for: context(text: "[/review-github-pr](demo://review) "))
 
         XCTAssertEqual(hint?.text, "[PR URL]")
+    }
+
+    func testLinkBackedSlashCommandWithoutTrailingSpaceUsesLeadingSpace() {
+        let hints = BlockInputSlashCommandArgumentHints(["review-github-pr": "[PR URL]"])
+
+        let hint = hints.inlineHint(for: context(text: "[/review-github-pr](demo://review)"))
+
+        XCTAssertEqual(hint?.text, " [PR URL]")
     }
 
     func testLinkBackedSlashCommandAllowsEscapedClosingParenthesisInDestination() {
