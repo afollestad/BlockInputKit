@@ -8,6 +8,7 @@ enum BlockInputInlineMarkdownStyle: Hashable {
     case strikethrough
     case link
     case rawSlashCommand
+    case rawFileMention
 }
 
 /// UTF-16 ranges for one visual inline Markdown span.
@@ -51,6 +52,7 @@ enum BlockInputInlineMarkdownParsing {
         excluding excludedRanges: [NSRange] = [],
         fileBaseURL: URL? = nil,
         rawSlashCommandChips: Bool = false,
+        rawFileMentionChips: Bool = false,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false
     ) -> [BlockInputInlineMarkdownRange] {
@@ -67,19 +69,40 @@ enum BlockInputInlineMarkdownParsing {
             excluding: excludedRangeLookup,
             fileBaseURL: fileBaseURL
         )
-        let rawSlashRanges: [BlockInputInlineMarkdownRange] = rawSlashCommandChips ? {
-            let linkSourceRanges = linkSourceRanges(in: nsText, excluding: excludedRangeLookup)
-            return rawSlashCommandRanges(
+        // Raw token passes must not fire inside link source text or across
+        // markdown delimiters, so they build one shared stricter exclusion.
+        var rawExcludedRangeLookup: BlockInputExcludedRangeLookup?
+        if rawSlashCommandChips || rawFileMentionChips {
+            let excludedLinkSourceRanges = linkSourceRanges(in: nsText, excluding: excludedRangeLookup)
+            rawExcludedRangeLookup = BlockInputExcludedRangeLookup(
+                textLength: nsText.length,
+                ranges: excludedRanges + excludedLinkSourceRanges + nonRawRangeGroups.delimiterRanges
+            )
+        }
+        let rawSlashRanges: [BlockInputInlineMarkdownRange]
+        if rawSlashCommandChips, let rawExcludedRangeLookup {
+            rawSlashRanges = rawSlashCommandRanges(
                 in: nsText,
-                excluding: BlockInputExcludedRangeLookup(
-                    textLength: nsText.length,
-                    ranges: excludedRanges + linkSourceRanges + nonRawRangeGroups.delimiterRanges
-                ),
+                excluding: rawExcludedRangeLookup,
                 availability: slashCommandAvailability,
                 isDocumentStartBlock: isDocumentStartBlock
             )
-        }() : []
-        return mergedByContentLocation(nonRawRangeGroups.including(rawSlashRanges: rawSlashRanges))
+        } else {
+            rawSlashRanges = []
+        }
+        let mentionRanges: [BlockInputInlineMarkdownRange]
+        if rawFileMentionChips, let rawExcludedRangeLookup {
+            mentionRanges = rawFileMentionRanges(
+                in: nsText,
+                excluding: rawExcludedRangeLookup
+            )
+        } else {
+            mentionRanges = []
+        }
+        return mergedByContentLocation(nonRawRangeGroups.including(
+            rawSlashRanges: rawSlashRanges,
+            rawFileMentionRanges: mentionRanges
+        ))
     }
 
     private static func nonRawMarkdownRangeGroups(
@@ -107,39 +130,6 @@ enum BlockInputInlineMarkdownParsing {
             italicAsterisks: delimiterRanges(in: text, delimiter: singleAsterisk, style: .italic, excluding: excludedRangeLookup),
             italicUnderscores: delimiterRanges(in: text, delimiter: singleUnderscore, style: .italic, excluding: excludedRangeLookup)
         )
-    }
-
-    private static func rawSlashCommandRanges(
-        in text: NSString,
-        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
-        availability: BlockInputSlashCommandAvailability,
-        isDocumentStartBlock: Bool
-    ) -> [BlockInputInlineMarkdownRange] {
-        var ranges: [BlockInputInlineMarkdownRange] = []
-        var location = 0
-        while location < text.length {
-            guard let tokenRange = BlockInputCompletionTokenParsing.rawSlashCommandTokenRange(
-                startingAt: location,
-                in: text,
-                availability: availability,
-                isDocumentStartBlock: isDocumentStartBlock
-            ) else {
-                location += 1
-                continue
-            }
-            guard !excludedRangeLookup.intersects(tokenRange) else {
-                location = NSMaxRange(tokenRange)
-                continue
-            }
-            ranges.append(BlockInputInlineMarkdownRange(
-                style: .rawSlashCommand,
-                fullRange: tokenRange,
-                contentRange: tokenRange,
-                delimiterRanges: []
-            ))
-            location = NSMaxRange(tokenRange)
-        }
-        return ranges
     }
 
     private static let asterisk: unichar = 0x2A
@@ -419,10 +409,14 @@ private struct BlockInputInlineMarkdownRangeGroups {
         }
     }
 
-    func including(rawSlashRanges: [BlockInputInlineMarkdownRange]) -> [[BlockInputInlineMarkdownRange]] {
+    func including(
+        rawSlashRanges: [BlockInputInlineMarkdownRange],
+        rawFileMentionRanges: [BlockInputInlineMarkdownRange]
+    ) -> [[BlockInputInlineMarkdownRange]] {
         [
             links,
             rawSlashRanges,
+            rawFileMentionRanges,
             composedAsterisks,
             bold,
             strikethrough,

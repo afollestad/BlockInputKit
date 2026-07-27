@@ -7,6 +7,7 @@ extension BlockInputBlockItem {
         style: BlockInputStyle = .default,
         fileBaseURL: URL? = nil,
         rawSlashCommandChips: Bool = false,
+        rawFileMentionChips: Bool = false,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false,
         blockVerticalInsetMultiplier: CGFloat = 1
@@ -43,6 +44,7 @@ extension BlockInputBlockItem {
             style: style,
             fileBaseURL: fileBaseURL,
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock,
             blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
@@ -70,10 +72,7 @@ extension BlockInputBlockItem {
             for: block,
             text: text,
             inlineCodeRanges: inlineCodeRanges,
-            fileBaseURL: configuration.fileBaseURL,
-            rawSlashCommandChips: configuration.rawSlashCommandChips,
-            slashCommandAvailability: configuration.slashCommandAvailability,
-            isDocumentStartBlock: configuration.isDocumentStartBlock
+            configuration: configuration
         )
         let hiddenDelimiterRanges = (
             inlineCodeRanges.flatMap(\.delimiterRanges)
@@ -97,6 +96,7 @@ extension BlockInputBlockItem {
             block: block,
             fileBaseURL: configuration.fileBaseURL,
             rawSlashCommandChips: configuration.rawSlashCommandChips,
+            rawFileMentionChips: configuration.rawFileMentionChips,
             slashCommandAvailability: configuration.slashCommandAvailability,
             isDocumentStartBlock: configuration.isDocumentStartBlock
         )
@@ -149,6 +149,7 @@ extension BlockInputBlockItem {
                 block: context.block,
                 fileBaseURL: context.fileBaseURL,
                 rawSlashCommandChips: context.rawSlashCommandChips,
+                rawFileMentionChips: context.rawFileMentionChips,
                 slashCommandAvailability: context.slashCommandAvailability,
                 isDocumentStartBlock: context.isDocumentStartBlock
             ) : nil
@@ -219,6 +220,7 @@ extension BlockInputBlockItem {
                 style: style,
                 fileBaseURL: inlineChipMeasurement.fileBaseURL,
                 rawSlashCommandChips: inlineChipMeasurement.rawSlashCommandChips,
+                rawFileMentionChips: inlineChipMeasurement.rawFileMentionChips,
                 slashCommandAvailability: inlineChipMeasurement.slashCommandAvailability,
                 isDocumentStartBlock: inlineChipMeasurement.isDocumentStartBlock
             )
@@ -275,10 +277,7 @@ extension BlockInputBlockItem {
         for block: BlockInputBlock,
         text: String,
         inlineCodeRanges: [BlockInputInlineCodeRange],
-        fileBaseURL: URL?,
-        rawSlashCommandChips: Bool,
-        slashCommandAvailability: BlockInputSlashCommandAvailability,
-        isDocumentStartBlock: Bool
+        configuration: BlockInputTextHeightConfiguration
     ) -> [BlockInputInlineMarkdownRange] {
         guard supportsInlineMarkdownStyling(block.kind) else {
             return []
@@ -286,10 +285,11 @@ extension BlockInputBlockItem {
         return BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: text,
             excluding: inlineCodeRanges.map(\.fullRange),
-            fileBaseURL: fileBaseURL,
-            rawSlashCommandChips: rawSlashCommandChips,
-            slashCommandAvailability: slashCommandAvailability,
-            isDocumentStartBlock: isDocumentStartBlock
+            fileBaseURL: configuration.fileBaseURL,
+            rawSlashCommandChips: configuration.rawSlashCommandChips,
+            rawFileMentionChips: configuration.rawFileMentionChips,
+            slashCommandAvailability: configuration.slashCommandAvailability,
+            isDocumentStartBlock: configuration.isDocumentStartBlock
         )
     }
 
@@ -316,6 +316,7 @@ private struct BlockInputTextHeightContext {
     var block: BlockInputBlock
     var fileBaseURL: URL?
     var rawSlashCommandChips: Bool
+    var rawFileMentionChips: Bool
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
 }
@@ -324,6 +325,7 @@ private struct BlockInputInlineChipHeightMeasurement {
     var block: BlockInputBlock
     var fileBaseURL: URL?
     var rawSlashCommandChips: Bool
+    var rawFileMentionChips: Bool
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
 }
@@ -332,6 +334,7 @@ private struct BlockInputTextHeightConfiguration {
     var style: BlockInputStyle
     var fileBaseURL: URL?
     var rawSlashCommandChips: Bool
+    var rawFileMentionChips: Bool
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
     var blockVerticalInsetMultiplier: CGFloat

@@ -15,6 +15,7 @@ extension BlockInputView {
             disabledCursor: disabledCursor,
             inlineHint: inlineHint(for: item, block: block, blockIndex: resolvedBlockIndex),
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             selectAllBehavior: selectAllBehavior,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: resolvedBlockIndex == 0,

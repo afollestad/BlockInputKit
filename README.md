@@ -491,6 +491,22 @@ argument hints prepend one literal ASCII space, so virtual and typed separators 
 extra measurement or document mutation. Showing a hint does not move the document caret, and link-backed slash chips and
 `slashCommandChipClickHandler` routing are otherwise unchanged.
 
+### Raw File Mention Chips
+
+Set `rawFileMentionChips` to render literal `@`-prefixed file path tokens such as `@/Users/me/notes.md` or `@~/notes.md`
+as file chips while the underlying Markdown stays plain text:
+
+```swift
+let configuration = BlockInputConfiguration(
+    document: document,
+    rawFileMentionChips: true
+)
+```
+
+The `@` must sit at a token boundary and be followed by an absolute (`/`) or home-relative (`~/`) path, so mentions like
+`@channel` and mid-word `user@host` never match. Like raw slash chips, raw file-mention chips are visual only: editing,
+selection, copy, accessibility text, and Markdown export all see the literal token, and nothing is rewritten into a link.
+
 ### Inline Argument Hints
 
 Use `inlineHintProvider` for visual-only slash-command argument hints after the active caret. Hints are not inserted into

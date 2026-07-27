@@ -77,6 +77,7 @@ extension BlockInputView {
         disabledCursor = configuration.disabledCursor
         inlineHintProvider = configuration.inlineHintProvider
         rawSlashCommandChips = configuration.rawSlashCommandChips
+        rawFileMentionChips = configuration.rawFileMentionChips
         selectAllBehavior = configuration.selectAllBehavior
         completionReturnBehavior = configuration.completionReturnBehavior
         dropIndicatorColor = configuration.dropIndicatorColor

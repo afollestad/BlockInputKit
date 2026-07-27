@@ -218,6 +218,7 @@ extension BlockInputView {
                 style: style,
                 fileBaseURL: fileBaseURL,
                 rawSlashCommandChips: rawSlashCommandChips,
+                rawFileMentionChips: rawFileMentionChips,
                 slashCommandAvailability: slashCommandAvailability,
                 isDocumentStartBlock: index == 0,
                 blockVerticalInsetMultiplier: blockVerticalInsetMultiplier

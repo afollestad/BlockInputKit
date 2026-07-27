@@ -42,6 +42,39 @@ enum BlockInputCompletionTokenParsing {
         return NSRange(location: tokenStart, length: tokenEnd - tokenStart)
     }
 
+    /// Range of a literal `@`-prefixed file path token such as `@/usr/bin/env`
+    /// or `@~/notes.md`. The `@` must sit at a token boundary and be followed
+    /// by an absolute (`/`) or home-relative (`~/`) path with at least one
+    /// character after the path prefix, which keeps mentions like `@channel`
+    /// and mid-word `user@host` from matching.
+    static func rawFileMentionTokenRange(startingAt tokenStart: Int, in text: NSString) -> NSRange? {
+        guard tokenStart >= 0,
+              tokenStart < text.length,
+              text.character(at: tokenStart) == atSign,
+              isTokenStartBoundary(tokenStart, in: text) else {
+            return nil
+        }
+        var tokenEnd = tokenStart + 1
+        while tokenEnd < text.length,
+              !isTokenBoundary(text.character(at: tokenEnd)) {
+            tokenEnd += 1
+        }
+        let pathStart = tokenStart + 1
+        let pathLength = tokenEnd - pathStart
+        guard pathLength >= 2 else {
+            return nil
+        }
+        switch text.character(at: pathStart) {
+        case slash:
+            break
+        case tilde where text.character(at: pathStart + 1) == slash && pathLength >= 3:
+            break
+        default:
+            return nil
+        }
+        return NSRange(location: tokenStart, length: tokenEnd - tokenStart)
+    }
+
     static func allowsSlashCommandToken(
         startingAt tokenStart: Int,
         availability: BlockInputSlashCommandAvailability,
@@ -71,3 +104,5 @@ enum BlockInputCompletionTokenParsing {
 }
 
 private let slash: unichar = 0x2F
+private let atSign: unichar = 0x40
+private let tilde: unichar = 0x7E

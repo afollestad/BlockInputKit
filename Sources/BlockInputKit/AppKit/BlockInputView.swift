@@ -33,6 +33,8 @@ public final class BlockInputView: NSView {
     public internal(set) var inlineHintProvider: BlockInputInlineHintProvider?
     /// Whether raw slash-command tokens render as visual chips.
     public internal(set) var rawSlashCommandChips = false
+    /// Whether raw `@`-prefixed file path tokens render as visual chips.
+    public internal(set) var rawFileMentionChips = false
     /// Return-key behavior while the editor-owned completion popup is active.
     public internal(set) var completionReturnBehavior = BlockInputCompletionReturnBehavior.acceptHighlightedSuggestion
     /// Visual styling used for text, code, and selection chrome.
@@ -419,26 +421,6 @@ public final class BlockInputView: NSView {
         )
     }
 
-    /// Undoes the most recent text edit in the active block.
-    @discardableResult
-    public func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        guard isEditable,
-              let blockID = activeBlockID else {
-            return nil
-        }
-        return undoTextEdit(in: blockID)
-    }
-
-    /// Redoes the most recent undone text edit in the active block.
-    @discardableResult
-    public func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
-        guard isEditable,
-              let blockID = activeBlockID else {
-            return nil
-        }
-        return redoTextEdit(in: blockID)
-    }
-
     /// Undoes the most recent structural edit.
     @discardableResult
     public func undoStructuralEdit() -> BlockInputUndoResult? {
@@ -477,6 +459,28 @@ public final class BlockInputView: NSView {
         return result
     }
 
+}
+
+public extension BlockInputView {
+    /// Undoes the most recent text edit in the active block.
+    @discardableResult
+    func undoTextEditInActiveBlock() -> BlockInputUndoResult? {
+        guard isEditable,
+              let blockID = activeBlockID else {
+            return nil
+        }
+        return undoTextEdit(in: blockID)
+    }
+
+    /// Redoes the most recent undone text edit in the active block.
+    @discardableResult
+    func redoTextEditInActiveBlock() -> BlockInputUndoResult? {
+        guard isEditable,
+              let blockID = activeBlockID else {
+            return nil
+        }
+        return redoTextEdit(in: blockID)
+    }
 }
 
 private extension BlockInputView {

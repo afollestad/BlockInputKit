@@ -69,6 +69,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var isEditable = true
     var disabledCursor: NSCursor?
     var rawSlashCommandChips = false
+    var rawFileMentionChips = false
     var selectAllBehavior = BlockInputSelectAllBehavior.focusedContentThenDocument
     var slashCommandAvailability = BlockInputSlashCommandAvailability.documentStart
     var isDocumentStartBlock = false
@@ -205,6 +206,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         disabledCursor: NSCursor? = nil,
         inlineHint: BlockInputInlineHint? = nil,
         rawSlashCommandChips: Bool = false,
+        rawFileMentionChips: Bool = false,
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false,
@@ -225,6 +227,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.fileBaseURL = fileBaseURL
         applySlashCommandConfiguration(
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             selectAllBehavior: selectAllBehavior,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
@@ -407,22 +410,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         return blockTextView?.collapsedBlockSelectionDragNativeRange() ?? oldSelectedCharRange
     }
 
-    func setBlockSelection(_ isSelected: Bool) {
-        let wasConfiguringBlock = isConfiguringBlock
-        isConfiguringBlock = true
-        defer { isConfiguringBlock = wasConfiguringBlock }
-
-        clearTemporarySelectionHighlight()
-        applySelectionChrome(isSelected ? .whole : .none)
-        horizontalRuleView.isSelected = isHorizontalRule && isSelected
-        if isSelected {
-            setImageCaretOffset(nil)
-        }
-        if isSelected {
-            collapseNativeSelectionIfNeeded()
-        }
-    }
-
     private func updateHoverTrackingArea() {
         if let trackingArea {
             view.removeTrackingArea(trackingArea)
@@ -439,6 +426,22 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
 }
 
 extension BlockInputBlockItem {
+    func setBlockSelection(_ isSelected: Bool) {
+        let wasConfiguringBlock = isConfiguringBlock
+        isConfiguringBlock = true
+        defer { isConfiguringBlock = wasConfiguringBlock }
+
+        clearTemporarySelectionHighlight()
+        applySelectionChrome(isSelected ? .whole : .none)
+        horizontalRuleView.isSelected = isHorizontalRule && isSelected
+        if isSelected {
+            setImageCaretOffset(nil)
+        }
+        if isSelected {
+            collapseNativeSelectionIfNeeded()
+        }
+    }
+
     func replaceCurrentTextFromEditorCorrection(_ text: String, selectedRange: NSRange) {
         let wasConfiguringBlock = isConfiguringBlock
         isConfiguringBlock = true
@@ -481,6 +484,7 @@ extension BlockInputBlockItem {
         tableView.delegate = nil
         renderedCodeColorScheme = nil
         rawSlashCommandChips = false
+        rawFileMentionChips = false
         selectAllBehavior = .focusedContentThenDocument
         slashCommandAvailability = .documentStart
         isDocumentStartBlock = false

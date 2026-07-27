@@ -276,6 +276,11 @@ public struct BlockInputConfiguration {
     /// Raw slash-command chips remain normal document text for editing, selection, copy, accessibility, and Markdown
     /// export.
     public var rawSlashCommandChips: Bool
+    /// Whether raw `@/absolute/path` and `@~/home/path` tokens render as visual file chips.
+    ///
+    /// Raw file-mention chips remain normal document text for editing, selection, copy, accessibility, and Markdown
+    /// export; nothing is rewritten into a link.
+    public var rawFileMentionChips: Bool
     /// Color used for editor accent affordances, including drag insertion and selected horizontal rules.
     public var dropIndicatorColor: NSColor
     /// Visual styling for editor text, code, and selection chrome.
@@ -400,6 +405,7 @@ public struct BlockInputConfiguration {
         disabledCursor: NSCursor? = nil,
         inlineHintProvider: BlockInputInlineHintProvider? = nil,
         rawSlashCommandChips: Bool = false,
+        rawFileMentionChips: Bool = false,
         dropIndicatorColor: NSColor = .controlAccentColor,
         style: BlockInputStyle = .default,
         selectAllBehavior: BlockInputSelectAllBehavior = .focusedContentThenDocument,
@@ -445,6 +451,7 @@ public struct BlockInputConfiguration {
         self.disabledCursor = disabledCursor
         self.inlineHintProvider = inlineHintProvider
         self.rawSlashCommandChips = rawSlashCommandChips
+        self.rawFileMentionChips = rawFileMentionChips
         self.dropIndicatorColor = dropIndicatorColor
         self.style = style
         self.selectAllBehavior = selectAllBehavior

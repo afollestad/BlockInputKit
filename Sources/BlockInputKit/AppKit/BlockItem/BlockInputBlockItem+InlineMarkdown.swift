@@ -10,6 +10,7 @@ extension BlockInputBlockItem {
             style: style,
             fileBaseURL: fileBaseURL,
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
         )
@@ -21,6 +22,7 @@ extension BlockInputBlockItem {
         style: BlockInputStyle,
         fileBaseURL: URL? = nil,
         rawSlashCommandChips: Bool = false,
+        rawFileMentionChips: Bool = false,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false
     ) {
@@ -34,6 +36,7 @@ extension BlockInputBlockItem {
             excluding: inlineCodeRanges,
             fileBaseURL: fileBaseURL,
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
         )
@@ -152,7 +155,7 @@ extension BlockInputBlockItem {
                 ],
                 range: range
             )
-        case .rawSlashCommand:
+        case .rawSlashCommand, .rawFileMention:
             applyInlineChip(to: range, in: textStorage, baseFont: baseFont, style: .init())
         }
     }
@@ -196,7 +199,7 @@ extension BlockInputBlockItem {
         )
 
         switch kind {
-        case .fileLink:
+        case .fileLink, .rawFileMention:
             applyInlineChipWhitespaceSpacing(
                 at: NSMaxRange(markdownRange.fullRange),
                 text: text,
@@ -266,7 +269,7 @@ extension BlockInputBlockItem {
             case .link:
                 attributes[.foregroundColor] = NSColor.linkColor
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
-            case .rawSlashCommand:
+            case .rawSlashCommand, .rawFileMention:
                 break
             }
         }
@@ -280,7 +283,7 @@ extension BlockInputBlockItem {
 
 private extension Set where Element == BlockInputInlineMarkdownStyle {
     var sortedByAttributeOrder: [BlockInputInlineMarkdownStyle] {
-        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand].filter { contains($0) }
+        [.bold, .italic, .underline, .strikethrough, .link, .rawSlashCommand, .rawFileMention].filter { contains($0) }
     }
 }
 
