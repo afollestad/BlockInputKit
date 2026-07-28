@@ -158,6 +158,10 @@ extension BlockInputView {
                 mode = .create
                 text = prefilledText ?? (range.length > 0 ? linkCreationText(in: block, range: range) : "")
                 urlString = prefilledURLString ?? ""
+            case .edit(let linkRange) where linkRange.style == .rawFileMention:
+                mode = .editFileMention
+                text = ""
+                urlString = prefilledURLString ?? linkRange.linkRawDestination ?? ""
             case .edit(let linkRange):
                 mode = .edit
                 text = prefilledText ?? linkText(in: block, range: linkRange)
@@ -182,15 +186,18 @@ extension BlockInputView {
     ) {
         modal.onSave = { [weak self] text, urlString in
             guard let self else { return }
-            guard applyLinkEdit(
-                context: context,
-                text: text,
-                urlString: urlString,
-                actionName: mode == .create ? "Insert Link" : "Edit Link"
-            ) else {
-                dismissLinkModal(restoreFocus: false)
-                return
+            let didApply: Bool
+            if mode == .editFileMention {
+                didApply = applyFileMentionEdit(context: context, path: urlString)
+            } else {
+                didApply = applyLinkEdit(
+                    context: context,
+                    text: text,
+                    urlString: urlString,
+                    actionName: mode == .create ? "Insert Link" : "Edit Link"
+                )
             }
+            _ = didApply
             dismissLinkModal(restoreFocus: false)
         }
         modal.onRemove = { [weak self] in
@@ -199,13 +206,17 @@ extension BlockInputView {
             dismissLinkModal(restoreFocus: false)
         }
         modal.onOpen = { [weak self, weak modal] urlString in
+            guard let self else { return }
+            if mode == .editFileMention {
+                _ = linkURLOpener(URL(fileURLWithPath: NSString(string: urlString).expandingTildeInPath))
+                return
+            }
             let allowsCustomSchemes = modal?.textField.stringValue.hasPrefix("/") == true
-            guard let self,
-                  let url = BlockInputLinkURL.supportedURL(
-                    from: urlString,
-                    allowsCustomSchemes: allowsCustomSchemes,
-                    fileBaseURL: fileBaseURL
-                  ) else { return }
+            guard let url = BlockInputLinkURL.supportedURL(
+                from: urlString,
+                allowsCustomSchemes: allowsCustomSchemes,
+                fileBaseURL: fileBaseURL
+            ) else { return }
             _ = linkURLOpener(url)
         }
         modal.onCancel = { [weak self] in
@@ -365,7 +376,7 @@ extension BlockInputView {
         linkText(in: block, sourceRange: range.contentRange).blockInputUnescapedLinkLabel
     }
 
-    private func replaceLinkSource(
+    func replaceLinkSource(
         context: BlockInputLinkContext,
         block: inout BlockInputBlock,
         index: Int,
@@ -381,6 +392,11 @@ extension BlockInputView {
         switch context.mode {
         case .create(let range):
             replacementRange = block.text.blockInputLinkClampedRange(range)
+        case .edit(let existingLinkRange) where existingLinkRange.style == .rawFileMention:
+            guard existingLinkRange == fileMentionRange(in: block.text, containing: existingLinkRange.contentRange) else {
+                return false
+            }
+            replacementRange = block.text.blockInputLinkClampedRange(existingLinkRange.fullRange)
         case .edit(let existingLinkRange):
             guard existingLinkRange == linkRange(in: block.text, containing: existingLinkRange.contentRange) else {
                 return false

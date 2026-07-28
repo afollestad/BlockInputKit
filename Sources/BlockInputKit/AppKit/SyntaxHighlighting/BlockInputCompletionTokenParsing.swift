@@ -75,6 +75,28 @@ enum BlockInputCompletionTokenParsing {
         return NSRange(location: tokenStart, length: tokenEnd - tokenStart)
     }
 
+    /// Whether `path` can serialize back into a valid `@path` mention token:
+    /// an absolute or home-relative prefix with at least one character after
+    /// it and no token-boundary characters that would truncate the token.
+    static func isValidRawFileMentionPath(_ path: String) -> Bool {
+        let nsPath = path as NSString
+        guard nsPath.length >= 2 else {
+            return false
+        }
+        switch nsPath.character(at: 0) {
+        case slash:
+            break
+        case tilde where nsPath.length >= 3 && nsPath.character(at: 1) == slash:
+            break
+        default:
+            return false
+        }
+        for index in 0..<nsPath.length where isTokenBoundary(nsPath.character(at: index)) {
+            return false
+        }
+        return true
+    }
+
     static func allowsSlashCommandToken(
         startingAt tokenStart: Int,
         availability: BlockInputSlashCommandAvailability,

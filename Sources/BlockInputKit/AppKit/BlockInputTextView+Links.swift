@@ -165,7 +165,7 @@ extension BlockInputTextView {
         textContainer: NSTextContainer
     ) -> BlockInputLinkHitResult? {
         let location = convert(windowLocation, from: nil)
-        for linkRange in linkRangesForCurrentText() where linkRange.inlineChipKind(in: string) != nil {
+        for linkRange in inlineChipVisualRangesForCurrentText() {
             let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)
@@ -200,7 +200,11 @@ extension BlockInputTextView {
             return
         }
         layoutManager.ensureLayout(for: textContainer)
-        for linkRange in linkRangesForCurrentText() where linkRange.contentRange.length > 0 {
+        // Chip ranges include raw mention chips, which are not `.link` styled;
+        // non-chip links keep their tighter label-based cursor rects.
+        let chipRanges = inlineChipVisualRangesForCurrentText()
+        let plainLinkRanges = linkRangesForCurrentText().filter { $0.inlineChipKind(in: string) == nil }
+        for linkRange in (chipRanges + plainLinkRanges) where linkRange.contentRange.length > 0 {
             let characterRange = string.linkCursorClampedRange(linkRange.contentRange)
             let glyphRange = layoutManager.glyphRange(forCharacterRange: characterRange, actualCharacterRange: nil)
                 .clamped(toGlyphCount: layoutManager.numberOfGlyphs)

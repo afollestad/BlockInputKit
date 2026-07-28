@@ -55,11 +55,14 @@ extension BlockInputInlineMarkdownParsing {
                 location = NSMaxRange(tokenRange)
                 continue
             }
+            let path = text.substring(with: NSRange(location: tokenRange.location + 1, length: tokenRange.length - 1))
             ranges.append(BlockInputInlineMarkdownRange(
                 style: .rawFileMention,
                 fullRange: tokenRange,
                 contentRange: tokenRange,
-                delimiterRanges: []
+                delimiterRanges: [],
+                linkDestination: URL(fileURLWithPath: NSString(string: path).expandingTildeInPath),
+                linkRawDestination: path
             ))
             location = NSMaxRange(tokenRange)
         }

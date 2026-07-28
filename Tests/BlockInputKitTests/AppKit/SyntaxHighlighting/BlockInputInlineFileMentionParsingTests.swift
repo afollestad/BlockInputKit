@@ -14,6 +14,21 @@ final class BlockInputInlineFileMentionParsingTests: XCTestCase {
         XCTAssertEqual(range.contentRange, range.fullRange)
         XCTAssertEqual(range.delimiterRanges, [])
         XCTAssertEqual(range.inlineChipKind(in: text), .rawFileMention)
+        XCTAssertEqual(range.linkDestination, URL(fileURLWithPath: "/Users/test/.claude/RTK.md"))
+        XCTAssertEqual(range.linkRawDestination, "/Users/test/.claude/RTK.md")
+    }
+
+    func testHomeRelativeMentionExpandsTildeInDestination() throws {
+        let range = try XCTUnwrap(BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
+            in: "Read @~/notes.md today",
+            rawFileMentionChips: true
+        ).first { $0.style == .rawFileMention })
+
+        XCTAssertEqual(
+            range.linkDestination,
+            URL(fileURLWithPath: NSString(string: "~/notes.md").expandingTildeInPath)
+        )
+        XCTAssertEqual(range.linkRawDestination, "~/notes.md")
     }
 
     func testParsesHomeRelativePathMention() {
@@ -93,6 +108,17 @@ final class BlockInputInlineFileMentionParsingTests: XCTestCase {
             ranges.map { content(in: text, range: $0.contentRange) },
             ["@/a/b.md", "@/c/d)"]
         )
+    }
+
+    func testValidRawFileMentionPaths() {
+        XCTAssertTrue(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("/Users/test/RTK.md"))
+        XCTAssertTrue(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("~/notes.md"))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath(""))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("/"))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("~/"))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("relative/path.md"))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("/path with space.md"))
+        XCTAssertFalse(BlockInputCompletionTokenParsing.isValidRawFileMentionPath("~x/notes.md"))
     }
 
     func testMentionChipUsesFileChipStyle() {

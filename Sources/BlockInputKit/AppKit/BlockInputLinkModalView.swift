@@ -81,18 +81,23 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
 
     func configure(mode: BlockInputLinkModalMode, text: String, urlString: String) {
         self.mode = mode
+        let isFileMention = mode == .editFileMention
         textField.stringValue = text
         textField.currentEditor()?.string = text
         urlField.stringValue = urlString
         urlField.currentEditor()?.string = urlString
+        textLabel.isHidden = isFileMention
+        textField.isHidden = isFileMention
+        urlLabel.stringValue = isFileMention ? "Path" : "URL"
         openButton.isHidden = false
-        removeButton.isHidden = mode == .create
+        // A mention has no link formatting to remove; deleting the token is a normal text edit.
+        removeButton.isHidden = mode != .edit
         validateFields()
         window?.invalidateCursorRects(for: self)
     }
 
     func focusInitialField() {
-        fieldFocus.focus(textField)
+        fieldFocus.focus(mode == .editFileMention ? urlField : textField)
     }
 
     func controlTextDidBeginEditing(_ notification: Notification) {
@@ -137,6 +142,13 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     }
 
     @objc private func open(_ sender: Any?) {
+        if mode == .editFileMention {
+            guard BlockInputCompletionTokenParsing.isValidRawFileMentionPath(urlField.stringValue) else {
+                return
+            }
+            onOpen?(urlField.stringValue)
+            return
+        }
         guard currentURLIsSupported else {
             return
         }
@@ -207,6 +219,12 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
     }
 
     private func validateFields() {
+        if mode == .editFileMention {
+            let isValidPath = BlockInputCompletionTokenParsing.isValidRawFileMentionPath(urlField.stringValue)
+            saveButton.isEnabled = isValidPath
+            openButton.isEnabled = isValidPath
+            return
+        }
         let hasText = !textField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasSupportedURL = currentURLIsSupported
         saveButton.isEnabled = hasText && hasSupportedURL
@@ -295,9 +313,11 @@ final class BlockInputLinkModalView: NSView, NSTextFieldDelegate {
 }
 
 /// Link modal presentation mode. Create mode inserts Markdown; edit mode exposes open and remove actions.
+/// File-mention mode edits a literal `@path` token: it shows only the path field and never writes link Markdown.
 enum BlockInputLinkModalMode {
     case create
     case edit
+    case editFileMention
 }
 
 /// Non-interactive red background used to make the remove button read as a critical action.

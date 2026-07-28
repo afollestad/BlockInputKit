@@ -504,8 +504,11 @@ let configuration = BlockInputConfiguration(
 ```
 
 The `@` must sit at a token boundary and be followed by an absolute (`/`) or home-relative (`~/`) path, so mentions like
-`@channel` and mid-word `user@host` never match. Like raw slash chips, raw file-mention chips are visual only: editing,
-selection, copy, accessibility text, and Markdown export all see the literal token, and nothing is rewritten into a link.
+`@channel` and mid-word `user@host` never match. Editing, selection, copy, accessibility text, and Markdown export all
+see the literal token, and nothing is rewritten into a link. Plain-clicking a mention chip shows the link modal in a
+file-mention mode with a single path field: saving replaces the token with a new literal `@path` — never link Markdown —
+and the open button resolves the tilde-expanded file URL through `urlOpener`. Command clicks and read-only editors open
+the file directly.
 
 ### Inline Argument Hints
 

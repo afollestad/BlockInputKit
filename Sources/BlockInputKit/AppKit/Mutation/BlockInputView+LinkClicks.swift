@@ -7,6 +7,20 @@ extension BlockInputView {
         clickedLinkRange: BlockInputInlineMarkdownRange? = nil,
         event: NSEvent
     ) -> Bool {
+        // Command-clicked or read-only mention chips open their file directly.
+        // Plain clicks fall through to the modal path, which presents the
+        // file-mention mode: it edits the literal `@path` token and never
+        // writes link markdown, which hosts rely on staying plain text.
+        if let clickedLinkRange,
+           clickedLinkRange.style == .rawFileMention,
+           let destination = clickedLinkRange.linkDestination,
+           event.modifierFlags.contains(.command) || !isEditable {
+            let didOpen = linkURLOpener(destination)
+            if didOpen {
+                dismissLinkModal(restoreFocus: false)
+            }
+            return didOpen
+        }
         guard let context = linkContext(
             blockID: blockID,
             selectedRange: selectedRange,
