@@ -20,6 +20,7 @@ extension BlockInputBlockItem {
             excluding: inlineCodeRanges,
             fileBaseURL: fileBaseURL,
             rawSlashCommandChips: rawSlashCommandChips,
+            rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock
         )

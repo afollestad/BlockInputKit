@@ -328,6 +328,7 @@ extension BlockInputTextView {
             excluding: BlockInputCodeParsing.inlineCodeRanges(in: string).map(\.fullRange),
             fileBaseURL: blockItem?.fileBaseURL,
             rawSlashCommandChips: rendersRawSlashCommandChips,
+            rawFileMentionChips: rendersRawFileMentionChips,
             slashCommandAvailability: blockItem?.slashCommandAvailability ?? .documentStart,
             isDocumentStartBlock: blockItem?.isDocumentStartBlock == true
         )
@@ -342,6 +343,13 @@ extension BlockInputTextView {
             return false
         }
         return blockItem?.rawSlashCommandChips == true
+    }
+
+    private var rendersRawFileMentionChips: Bool {
+        guard blockItem?.isTableCellTextView(self) != true else {
+            return false
+        }
+        return blockItem?.rawFileMentionChips == true
     }
 
     private func inlineChipBackgroundRects(
