@@ -12,8 +12,11 @@ extension BlockInputBlockItem {
             rawSlashCommandChips: rawSlashCommandChips,
             rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
-            isDocumentStartBlock: isDocumentStartBlock
+            isDocumentStartBlock: isDocumentStartBlock,
+            inlineImageSizes: inlineImageStore?.sizesSnapshot() ?? .empty,
+            inlineImageMaximumWidth: inlineImageMaximumTextWidth
         )
+        startInlineImageLoads(in: textStorage)
     }
 
     static func applyInlineMarkdownAttributes(
@@ -24,7 +27,10 @@ extension BlockInputBlockItem {
         rawSlashCommandChips: Bool = false,
         rawFileMentionChips: Bool = false,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
-        isDocumentStartBlock: Bool = false
+        isDocumentStartBlock: Bool = false,
+        inlineImages: Bool = true,
+        inlineImageSizes: BlockInputInlineImageSizes = .empty,
+        inlineImageMaximumWidth: CGFloat = .greatestFiniteMagnitude
     ) {
         guard Self.supportsInlineMarkdownStyling(block.kind) else {
             return
@@ -38,41 +44,71 @@ extension BlockInputBlockItem {
             rawSlashCommandChips: rawSlashCommandChips,
             rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
-            isDocumentStartBlock: isDocumentStartBlock
+            isDocumentStartBlock: isDocumentStartBlock,
+            inlineImages: inlineImages
         )
         let baseFont = Self.font(for: block.kind, style: style)
         for markdownRange in markdownRanges {
-            let inlineChipKind = markdownRange.inlineChipKind(in: textStorage.string)
-            let inlineChipStyle = inlineChipKind.map { style.inlineChipStyle(for: $0) }
-            Self.applyInlineMarkdownContentAttributes(
+            if markdownRange.style == .inlineImage {
+                Self.applyInlineImageAttributes(
+                    for: markdownRange,
+                    fullRange: fullRange,
+                    textStorage: textStorage,
+                    baseFont: baseFont,
+                    inlineImageSizes: inlineImageSizes,
+                    inlineImageMaximumWidth: inlineImageMaximumWidth
+                )
+                continue
+            }
+            Self.applyStyledRangeAttributes(
                 for: markdownRange,
                 excluding: inlineCodeRanges,
                 fullRange: fullRange,
                 textStorage: textStorage,
-                baseFont: baseFont,
-                inlineChipStyle: inlineChipStyle
+                style: style,
+                baseFont: baseFont
             )
-            for delimiterRange in markdownRange.delimiterRanges {
-                let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
-                guard clampedDelimiterRange.length > 0 else {
-                    continue
-                }
-                textStorage.addAttributes(
-                    [
-                        .font: Self.inlineMarkdownDelimiterFont(for: Self.font(for: block.kind, style: style)),
-                        .foregroundColor: NSColor.clear,
-                        .blockInputHiddenDelimiter: true
-                    ],
-                    range: clampedDelimiterRange
-                )
+        }
+    }
+
+    private static func applyStyledRangeAttributes(
+        for markdownRange: BlockInputInlineMarkdownRange,
+        excluding inlineCodeRanges: [NSRange],
+        fullRange: NSRange,
+        textStorage: NSTextStorage,
+        style: BlockInputStyle,
+        baseFont: NSFont
+    ) {
+        let inlineChipKind = markdownRange.inlineChipKind(in: textStorage.string)
+        let inlineChipStyle = inlineChipKind.map { style.inlineChipStyle(for: $0) }
+        Self.applyInlineMarkdownContentAttributes(
+            for: markdownRange,
+            excluding: inlineCodeRanges,
+            fullRange: fullRange,
+            textStorage: textStorage,
+            baseFont: baseFont,
+            inlineChipStyle: inlineChipStyle
+        )
+        for delimiterRange in markdownRange.delimiterRanges {
+            let clampedDelimiterRange = NSIntersectionRange(delimiterRange, fullRange)
+            guard clampedDelimiterRange.length > 0 else {
+                continue
             }
-            if let inlineChipKind {
-                Self.applyInlineChipSpacing(
-                    for: markdownRange,
-                    kind: inlineChipKind,
-                    in: textStorage
-                )
-            }
+            textStorage.addAttributes(
+                [
+                    .font: Self.inlineMarkdownDelimiterFont(for: baseFont),
+                    .foregroundColor: NSColor.clear,
+                    .blockInputHiddenDelimiter: true
+                ],
+                range: clampedDelimiterRange
+            )
+        }
+        if let inlineChipKind {
+            Self.applyInlineChipSpacing(
+                for: markdownRange,
+                kind: inlineChipKind,
+                in: textStorage
+            )
         }
     }
 
@@ -114,7 +150,10 @@ extension BlockInputBlockItem {
             fileBaseURL: fileBaseURL
         )
         return Set(markdownRanges.compactMap { markdownRange in
-            selectedRange.intersectsStyledContent(markdownRange.contentRange) ? markdownRange.style : nil
+            guard markdownRange.style != .inlineImage else {
+                return nil
+            }
+            return selectedRange.intersectsStyledContent(markdownRange.contentRange) ? markdownRange.style : nil
         })
     }
 
@@ -155,6 +194,9 @@ extension BlockInputBlockItem {
                 ],
                 range: range
             )
+        case .inlineImage:
+            // Handled by applyInlineImageAttributes; never styled through this path.
+            break
         case .rawSlashCommand, .rawFileMention:
             applyInlineChip(to: range, in: textStorage, baseFont: baseFont, style: .init())
         }
@@ -269,7 +311,7 @@ extension BlockInputBlockItem {
             case .link:
                 attributes[.foregroundColor] = NSColor.linkColor
                 attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
-            case .rawSlashCommand, .rawFileMention:
+            case .inlineImage, .rawSlashCommand, .rawFileMention:
                 break
             }
         }

@@ -107,6 +107,29 @@ final class BlockInputImageLoadingTests: XCTestCase {
         XCTAssertEqual(cachedKeys, ["remote"])
     }
 
+    func testDefaultLoaderReadsSVGDimensionsThroughNSImageFallback() async throws {
+        let svg = #"<svg xmlns="http://www.w3.org/2000/svg" width="23" height="20"><rect width="23" height="20" fill="orange"/></svg>"#
+        let svgURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("svg")
+        try XCTUnwrap(svg.data(using: .utf8)).write(to: svgURL)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: svgURL)
+        }
+        let request = BlockInputImageLoadRequest(
+            image: BlockInputImage(source: svgURL.absoluteString),
+            resolvedURL: svgURL,
+            cacheKey: "svg",
+            maxSourceBytes: 1024 * 1024,
+            maxPixelDimension: 100,
+            diskCache: nil
+        )
+
+        let loaded = try await BlockInputDefaultImageLoader().loadImage(request)
+
+        XCTAssertEqual(loaded.dimensions, BlockInputImageDimensions(width: 23, height: 20))
+    }
+
     private func temporaryPNGURL() throws -> URL {
         let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
             .appendingPathComponent(UUID().uuidString)

@@ -10,7 +10,8 @@ extension BlockInputBlockItem {
         rawFileMentionChips: Bool = false,
         slashCommandAvailability: BlockInputSlashCommandAvailability = .documentStart,
         isDocumentStartBlock: Bool = false,
-        blockVerticalInsetMultiplier: CGFloat = 1
+        blockVerticalInsetMultiplier: CGFloat = 1,
+        inlineImageSizes: BlockInputInlineImageSizes = .empty
     ) -> CGFloat {
         let text = block.text.isEmpty ? " " : block.text
         let availableTextWidth = max(textWidth - perLineContentIndent(for: block), 120)
@@ -47,7 +48,8 @@ extension BlockInputBlockItem {
             rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock,
-            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
+            inlineImageSizes: inlineImageSizes
         )
         return textBlockHeight(textHeightContext(
             for: block,
@@ -91,6 +93,7 @@ extension BlockInputBlockItem {
             hiddenDelimiterRanges: hiddenDelimiterRanges,
             inlineCodeRanges: inlineCodeRanges,
             containsInlineChip: inlineMarkdownRanges.contains { $0.inlineChipKind(in: text) != nil },
+            containsInlineImage: inlineMarkdownRanges.contains { $0.style == .inlineImage },
             frontMatterReserve: frontMatterReserve,
             style: configuration.style,
             block: block,
@@ -98,7 +101,8 @@ extension BlockInputBlockItem {
             rawSlashCommandChips: configuration.rawSlashCommandChips,
             rawFileMentionChips: configuration.rawFileMentionChips,
             slashCommandAvailability: configuration.slashCommandAvailability,
-            isDocumentStartBlock: configuration.isDocumentStartBlock
+            isDocumentStartBlock: configuration.isDocumentStartBlock,
+            inlineImageSizes: configuration.inlineImageSizes
         )
     }
 
@@ -123,6 +127,7 @@ extension BlockInputBlockItem {
     private static func textBlockHeight(_ context: BlockInputTextHeightContext) -> CGFloat {
         if context.inlineCodeRanges.isEmpty,
            !context.containsInlineChip,
+           !context.containsInlineImage,
            isShortSingleLine(context.text, likelyFitting: context.availableTextWidth, font: context.font) {
             return max(
                 context.metrics.minimumHeight + context.frontMatterReserve,
@@ -145,14 +150,18 @@ extension BlockInputBlockItem {
             hiddenDelimiterRanges: context.hiddenDelimiterRanges,
             inlineCodeRanges: context.inlineCodeRanges,
             style: context.style,
-            inlineChipMeasurement: context.containsInlineChip ? BlockInputInlineChipHeightMeasurement(
-                block: context.block,
-                fileBaseURL: context.fileBaseURL,
-                rawSlashCommandChips: context.rawSlashCommandChips,
-                rawFileMentionChips: context.rawFileMentionChips,
-                slashCommandAvailability: context.slashCommandAvailability,
-                isDocumentStartBlock: context.isDocumentStartBlock
-            ) : nil
+            inlineChipMeasurement: context.containsInlineChip || context.containsInlineImage
+                ? BlockInputInlineChipHeightMeasurement(
+                    block: context.block,
+                    fileBaseURL: context.fileBaseURL,
+                    rawSlashCommandChips: context.rawSlashCommandChips,
+                    rawFileMentionChips: context.rawFileMentionChips,
+                    slashCommandAvailability: context.slashCommandAvailability,
+                    isDocumentStartBlock: context.isDocumentStartBlock,
+                    inlineImageSizes: context.inlineImageSizes,
+                    inlineImageMaximumWidth: context.availableTextWidth
+                )
+                : nil
         )
         let measuredTextHeight = context.hiddenDelimiterRanges.isEmpty
             ? max(ceil(boundingRect.height), textKitHeight)
@@ -222,7 +231,9 @@ extension BlockInputBlockItem {
                 rawSlashCommandChips: inlineChipMeasurement.rawSlashCommandChips,
                 rawFileMentionChips: inlineChipMeasurement.rawFileMentionChips,
                 slashCommandAvailability: inlineChipMeasurement.slashCommandAvailability,
-                isDocumentStartBlock: inlineChipMeasurement.isDocumentStartBlock
+                isDocumentStartBlock: inlineChipMeasurement.isDocumentStartBlock,
+                inlineImageSizes: inlineChipMeasurement.inlineImageSizes,
+                inlineImageMaximumWidth: inlineChipMeasurement.inlineImageMaximumWidth
             )
         }
         for delimiterRange in hiddenDelimiterRanges {
@@ -311,6 +322,7 @@ private struct BlockInputTextHeightContext {
     var hiddenDelimiterRanges: [NSRange]
     var inlineCodeRanges: [BlockInputInlineCodeRange]
     var containsInlineChip: Bool
+    var containsInlineImage: Bool
     var frontMatterReserve: CGFloat
     var style: BlockInputStyle
     var block: BlockInputBlock
@@ -319,6 +331,7 @@ private struct BlockInputTextHeightContext {
     var rawFileMentionChips: Bool
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
+    var inlineImageSizes: BlockInputInlineImageSizes
 }
 
 private struct BlockInputInlineChipHeightMeasurement {
@@ -328,6 +341,8 @@ private struct BlockInputInlineChipHeightMeasurement {
     var rawFileMentionChips: Bool
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
+    var inlineImageSizes: BlockInputInlineImageSizes
+    var inlineImageMaximumWidth: CGFloat
 }
 
 private struct BlockInputTextHeightConfiguration {
@@ -338,4 +353,5 @@ private struct BlockInputTextHeightConfiguration {
     var slashCommandAvailability: BlockInputSlashCommandAvailability
     var isDocumentStartBlock: Bool
     var blockVerticalInsetMultiplier: CGFloat
+    var inlineImageSizes: BlockInputInlineImageSizes
 }

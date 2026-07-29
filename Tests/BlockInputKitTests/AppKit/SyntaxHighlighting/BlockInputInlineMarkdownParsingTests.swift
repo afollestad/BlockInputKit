@@ -43,14 +43,21 @@ final class BlockInputInlineMarkdownParsingTests: XCTestCase {
     func testParsesImageMarkdownLinks() throws {
         let text = "Open ![alt](https://example.com/image.png) and ![file](file:///tmp/image.png)"
         let ranges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(in: text)
-            .filter { $0.style == .link }
-        let firstRange = try XCTUnwrap(ranges.first)
+        // Remote image sources render inline; file destinations keep their chip rendering.
+        let imageRange = try XCTUnwrap(ranges.first { $0.style == .inlineImage })
+        let fileRange = try XCTUnwrap(ranges.first { $0.style == .link })
 
-        XCTAssertEqual(ranges.map { content(in: text, range: $0.contentRange) }, ["alt", "file"])
-        XCTAssertEqual(ranges.map { $0.linkDestination?.scheme }, ["https", "file"])
-        XCTAssertEqual(content(in: text, range: firstRange.fullRange), "![alt](https://example.com/image.png)")
-        XCTAssertEqual(firstRange.delimiterRanges.first, NSRange(location: 5, length: 2))
-        XCTAssertEqual(ranges.last?.inlineChipKind(in: text), .fileLink)
+        XCTAssertEqual(content(in: text, range: imageRange.fullRange), "![alt](https://example.com/image.png)")
+        XCTAssertEqual(content(in: text, range: imageRange.contentRange), "!")
+        XCTAssertEqual(imageRange.image, BlockInputImage(source: "https://example.com/image.png", altText: "alt"))
+        XCTAssertEqual(imageRange.delimiterRanges.count, 1)
+        XCTAssertEqual(
+            imageRange.delimiterRanges.first.map { content(in: text, range: $0) },
+            "[alt](https://example.com/image.png)"
+        )
+        XCTAssertEqual(content(in: text, range: fileRange.contentRange), "file")
+        XCTAssertEqual(fileRange.linkDestination?.scheme, "file")
+        XCTAssertEqual(fileRange.inlineChipKind(in: text), .fileLink)
     }
 
     func testParsesEscapedLinkLabelDelimitersAsHiddenSource() throws {

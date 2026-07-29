@@ -16,7 +16,8 @@ extension BlockInputInlineMarkdownParsing {
     static func linkRanges(
         in text: NSString,
         excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        inlineImages: Bool = true
     ) -> [BlockInputInlineMarkdownRange] {
         var ranges: [BlockInputInlineMarkdownRange] = []
         var location = 0
@@ -37,7 +38,8 @@ extension BlockInputInlineMarkdownParsing {
                 in: text,
                 openingBracketLocation: location,
                 excluding: excludedRangeLookup,
-                fileBaseURL: fileBaseURL
+                fileBaseURL: fileBaseURL,
+                inlineImages: inlineImages
             )
             if let linkRange = linkSearch.range {
                 ranges.append(linkRange)
@@ -94,12 +96,14 @@ extension BlockInputInlineMarkdownParsing {
         in text: NSString,
         openingBracketLocation: Int,
         excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        inlineImages: Bool = true
     ) -> BlockInputLinkSearch {
         let labelSearch = closingLinkLabelLocation(
             in: text,
             from: openingBracketLocation + 1,
-            excluding: excludedRangeLookup
+            excluding: excludedRangeLookup,
+            skippingNestedImageSpans: inlineImages
         )
         guard let closingBracketLocation = labelSearch.closingLocation,
               closingBracketLocation >= openingBracketLocation + 1,
@@ -134,7 +138,12 @@ extension BlockInputInlineMarkdownParsing {
             closingParenthesisLocation: closingParenthesisLocation
         )
         let sourceRange = sourceRanges.fullRange
-        guard let linkRange = parsedLinkRange(in: text, sourceRanges: sourceRanges, fileBaseURL: fileBaseURL) else {
+        guard let linkRange = parsedLinkRange(
+            in: text,
+            sourceRanges: sourceRanges,
+            fileBaseURL: fileBaseURL,
+            inlineImages: inlineImages
+        ) else {
             return BlockInputLinkSearch(range: nil, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
         }
         return BlockInputLinkSearch(range: linkRange, sourceRange: sourceRange, resumeLocation: NSMaxRange(sourceRange))
@@ -143,8 +152,20 @@ extension BlockInputInlineMarkdownParsing {
     private static func parsedLinkRange(
         in text: NSString,
         sourceRanges: BlockInputLinkSourceRanges,
-        fileBaseURL: URL? = nil
+        fileBaseURL: URL? = nil,
+        inlineImages: Bool = true
     ) -> BlockInputInlineMarkdownRange? {
+        if inlineImages {
+            // Only remote sources render inline; file and relative destinations keep
+            // their existing chip/link/plain-text behavior (local images stay host-owned).
+            if sourceRanges.imageMarkerLocation != nil,
+               let imageRange = parsedInlineImageRange(in: text, sourceRanges: sourceRanges) {
+                return imageRange
+            }
+            if let linkedImageRange = parsedLinkedImageRange(in: text, sourceRanges: sourceRanges, fileBaseURL: fileBaseURL) {
+                return linkedImageRange
+            }
+        }
         let label = text.substring(with: sourceRanges.labelRange)
         let urlString = normalizedLinkDestination(text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination)
         let allowsCustomSchemes = label.blockInputUnescapedLinkLabel.hasPrefix("/")
@@ -163,6 +184,73 @@ extension BlockInputInlineMarkdownParsing {
             delimiterRanges: linkDelimiterRanges(in: text, sourceRanges: sourceRanges),
             linkDestination: destination,
             linkRawDestination: urlString
+        )
+    }
+
+    /// Builds one `.inlineImage` range for `![alt](source)`: the `!` marker is the
+    /// single visible anchor character and everything else collapses out of layout.
+    /// Returns nil for non-remote sources so file-link chips and plain text keep
+    /// their existing rendering.
+    private static func parsedInlineImageRange(
+        in text: NSString,
+        sourceRanges: BlockInputLinkSourceRanges
+    ) -> BlockInputInlineMarkdownRange? {
+        guard let anchorLocation = sourceRanges.imageMarkerLocation else {
+            return nil
+        }
+        let source = text.substring(with: sourceRanges.urlRange)
+            .blockInputUnescapedLinkDestination
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedSource = normalizedLinkDestination(source)
+        guard normalizedSource.isRemoteInlineImageSource else {
+            return nil
+        }
+        let altText = text.substring(with: sourceRanges.labelRange).blockInputUnescapedLinkLabel
+        let fullRange = sourceRanges.fullRange
+        let hiddenRange = NSRange(
+            location: anchorLocation + 1,
+            length: NSMaxRange(fullRange) - anchorLocation - 1
+        )
+        return BlockInputInlineMarkdownRange(
+            style: .inlineImage,
+            fullRange: fullRange,
+            contentRange: NSRange(location: anchorLocation, length: 1),
+            delimiterRanges: [hiddenRange],
+            linkRawDestination: normalizedSource,
+            image: BlockInputImage(source: normalizedSource, altText: altText, sourceStyle: .markdown)
+        )
+    }
+
+    /// Detects `[![alt](source)](destination)` and renders the whole span as one
+    /// inline image, keeping the outer link destination for hosts that want it.
+    private static func parsedLinkedImageRange(
+        in text: NSString,
+        sourceRanges: BlockInputLinkSourceRanges,
+        fileBaseURL: URL?
+    ) -> BlockInputInlineMarkdownRange? {
+        let label = text.substring(with: sourceRanges.labelRange)
+        guard let match = BlockInputImageSyntaxParser.imageMatches(in: label).first,
+              match.range.location == 0,
+              match.range.length == (label as NSString).length,
+              match.image.source.isRemoteInlineImageSource else {
+            return nil
+        }
+        let urlString = normalizedLinkDestination(text.substring(with: sourceRanges.urlRange).blockInputUnescapedLinkDestination)
+        let destination = BlockInputLinkURL.supportedURL(
+            from: urlString,
+            allowsCustomSchemes: false,
+            fileBaseURL: fileBaseURL
+        )
+        let fullRange = sourceRanges.fullRange
+        let anchorLocation = fullRange.location
+        return BlockInputInlineMarkdownRange(
+            style: .inlineImage,
+            fullRange: fullRange,
+            contentRange: NSRange(location: anchorLocation, length: 1),
+            delimiterRanges: [NSRange(location: anchorLocation + 1, length: fullRange.length - 1)],
+            linkDestination: destination,
+            linkRawDestination: match.image.source,
+            image: match.image
         )
     }
 
@@ -191,7 +279,8 @@ extension BlockInputInlineMarkdownParsing {
     private static func closingLinkLabelLocation(
         in text: NSString,
         from startLocation: Int,
-        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup,
+        skippingNestedImageSpans: Bool = false
     ) -> BlockInputLinkClosingSearch {
         var location = startLocation
         while location < text.length {
@@ -200,6 +289,13 @@ extension BlockInputInlineMarkdownParsing {
                 return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: location + 1)
             }
             if character == linkOpeningBracket, !isEscapedLinkCharacter(at: location, in: text) {
+                // A nested image span inside the label (`[![alt](src)](href)`) is the
+                // one nesting form worth supporting; other nested brackets stay malformed.
+                if skippingNestedImageSpans,
+                   let nestedImageEnd = nestedImageSpanEnd(in: text, openingBracketLocation: location, excluding: excludedRangeLookup) {
+                    location = nestedImageEnd
+                    continue
+                }
                 return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: location + 1)
             }
             if character == linkClosingBracket,
@@ -210,6 +306,37 @@ extension BlockInputInlineMarkdownParsing {
             location += 1
         }
         return BlockInputLinkClosingSearch(closingLocation: nil, resumeLocation: text.length)
+    }
+
+    /// Returns the offset just past a nested `![…](…)` span starting at an unescaped `[`
+    /// preceded by an image marker, or nil when the bracket is not a nested image.
+    private static func nestedImageSpanEnd(
+        in text: NSString,
+        openingBracketLocation: Int,
+        excluding excludedRangeLookup: BlockInputExcludedRangeLookup
+    ) -> Int? {
+        guard imageMarkerLocation(before: openingBracketLocation, in: text) != nil else {
+            return nil
+        }
+        let labelSearch = closingLinkLabelLocation(
+            in: text,
+            from: openingBracketLocation + 1,
+            excluding: excludedRangeLookup
+        )
+        guard let closingBracketLocation = labelSearch.closingLocation,
+              closingBracketLocation + 1 < text.length,
+              text.character(at: closingBracketLocation + 1) == linkOpeningParenthesis else {
+            return nil
+        }
+        let destinationSearch = closingLinkDestinationLocation(
+            in: text,
+            from: closingBracketLocation + 2,
+            excluding: excludedRangeLookup
+        )
+        guard let closingParenthesisLocation = destinationSearch.closingLocation else {
+            return nil
+        }
+        return closingParenthesisLocation + 1
     }
 
     private static func closingLinkDestinationLocation(

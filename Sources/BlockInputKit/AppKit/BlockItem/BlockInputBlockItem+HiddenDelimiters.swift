@@ -42,6 +42,42 @@ final class BlockInputDelimiterGlyphs: NSObject, NSLayoutManagerDelegate {
         )
         return glyphRange.length
     }
+
+    /// Grows line fragments that carry inline images taller than the text. Images
+    /// center on the cap-height midline (GitHub's `vertical-align: middle`), so a
+    /// tall image needs room both above the baseline and below it.
+    func layoutManager(
+        _ layoutManager: NSLayoutManager,
+        shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
+        lineFragmentUsedRect: UnsafeMutablePointer<NSRect>,
+        baselineOffset: UnsafeMutablePointer<CGFloat>,
+        in textContainer: NSTextContainer,
+        forGlyphRange glyphRange: NSRange
+    ) -> Bool {
+        guard let textStorage = layoutManager.textStorage else {
+            return false
+        }
+        let characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        var neededAscent: CGFloat = 0
+        var neededDescent: CGFloat = 0
+        textStorage.enumerateAttribute(.blockInputInlineImage, in: characterRange) { value, _, _ in
+            guard let run = value as? BlockInputInlineImageRun else {
+                return
+            }
+            neededAscent = max(neededAscent, run.ascent)
+            neededDescent = max(neededDescent, run.baselineDrop)
+        }
+        let ascentDelta = max(0, ceil(neededAscent - baselineOffset.pointee))
+        let availableDescent = lineFragmentRect.pointee.height - baselineOffset.pointee
+        let descentDelta = max(0, ceil(neededDescent - availableDescent))
+        guard ascentDelta > 0 || descentDelta > 0 else {
+            return false
+        }
+        lineFragmentRect.pointee.size.height += ascentDelta + descentDelta
+        lineFragmentUsedRect.pointee.size.height += ascentDelta + descentDelta
+        baselineOffset.pointee += ascentDelta
+        return true
+    }
 }
 
 extension NSAttributedString.Key {

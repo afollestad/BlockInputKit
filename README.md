@@ -582,14 +582,29 @@ let configuration = BlockInputConfiguration(
 
 ## Images
 
-Markdown image syntax and HTML image tags parse as standalone `.image` blocks by default:
+Markdown image syntax and HTML image tags alone on their line parse as standalone `.image` blocks by default:
 
 ```markdown
 ![Alt Text](https://example.com/image.png)
 <img src="https://example.com/image.png" alt="Alt Text" width="320" height="180" />
 ```
 
-Images typed, pasted, parsed, or inserted in the middle of supported text split the source into text before, image block, and text after. Dropped local images insert below the target text block.
+Local or relative images typed, pasted, parsed, or inserted in the middle of supported text still split the source into text before, image block, and text after. Dropped local images insert below the target text block.
+
+### Inline Images
+
+Remote (`http`/`https`) images sharing a line with other text render inline within the line, matching GitHub:
+
+```markdown
+Codex flags **![P1](https://img.shields.io/badge/P1-orange) Add the required commit trailer** here.
+```
+
+- The image draws at its natural size (or declared `<img>` `width`/`height`), sitting on the text baseline; the line grows to fit taller images, and widths cap at the available text width.
+- The Markdown or HTML source stays in the document verbatim; only its rendering collapses, so export round-trips exactly.
+- The span edits atomically: arrows skip it as one character, any deletion touching it removes the whole source, and copying a selection across it yields the original syntax.
+- `[![alt](https://…)](https://…)`-style linked badges render as one inline image.
+- While loading, a line-height square placeholder reserves space; failed loads keep a placeholder with a warning glyph. Loads honor `allowsRemoteImageLoading`, the configured loader, disk cache, and byte/pixel limits.
+- Table cells do not render inline images yet; image syntax there keeps its file-chip/label rendering.
 
 Use `.textLinks` when images should stay as editable Markdown image text:
 

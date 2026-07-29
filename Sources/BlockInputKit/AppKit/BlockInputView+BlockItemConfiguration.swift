@@ -10,6 +10,7 @@ extension BlockInputView {
             style: style,
             blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
             imageLoadingContext: imageLoadingContext,
+            inlineImageStore: inlineImageStore,
             fileBaseURL: fileBaseURL,
             isEditable: isEditable,
             disabledCursor: disabledCursor,

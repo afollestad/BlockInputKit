@@ -29,6 +29,30 @@ extension BlockInputBlockItem {
         return true
     }
 
+    func textView(
+        _ textView: NSTextView,
+        willChangeSelectionFromCharacterRange oldSelectedCharRange: NSRange,
+        toCharacterRange newSelectedCharRange: NSRange
+    ) -> NSRange {
+        let newSelectedCharRange = clampedInlineImageSelection(
+            newSelectedCharRange,
+            from: oldSelectedCharRange,
+            in: textView
+        )
+        guard !isConfiguringBlock,
+              !isUpdatingBlockSelectionDrag,
+              isTrackingBlockSelectionDrag,
+              let event = currentBlockSelectionDragEvent() else {
+            return newSelectedCharRange
+        }
+        let blockTextView = textView as? BlockInputTextView
+        blockTextView?.rememberBlockSelectionDragRange(newSelectedCharRange)
+        guard updateBlockSelectionDrag(with: event, selectedRange: newSelectedCharRange) else {
+            return newSelectedCharRange
+        }
+        return blockTextView?.collapsedBlockSelectionDragNativeRange() ?? oldSelectedCharRange
+    }
+
     func requestLinkBoundaryDeletion(_ direction: BlockInputLinkBoundaryDeletionDirection) -> Bool {
         guard isEditable,
               let blockID else {
@@ -73,12 +97,20 @@ extension BlockInputBlockItem {
             fileBaseURL: fileBaseURL
         )
             .filter { range in
-                range.style == .link && range.fullRange.intersectionLength(with: affectedRange) > 0
-            }
-            .filter { range in
-                // Edits wholly inside the visible label are normal text edits; only expand deletions crossing hidden source.
-                affectedRange.location < range.contentRange.location ||
-                    NSMaxRange(affectedRange) > NSMaxRange(range.contentRange)
+                switch range.style {
+                case .link:
+                    guard range.fullRange.intersectionLength(with: affectedRange) > 0 else {
+                        return false
+                    }
+                    // Edits wholly inside the visible label are normal text edits; only expand deletions crossing hidden source.
+                    return affectedRange.location < range.contentRange.location ||
+                        NSMaxRange(affectedRange) > NSMaxRange(range.contentRange)
+                case .inlineImage:
+                    // Images have no editable interior, so any intersecting deletion removes the whole span.
+                    return range.fullRange.intersectionLength(with: affectedRange) > 0
+                case .bold, .italic, .underline, .strikethrough, .rawSlashCommand, .rawFileMention:
+                    return false
+                }
             }
         guard !overlappingLinks.isEmpty else {
             return nil
@@ -87,5 +119,39 @@ extension BlockInputBlockItem {
         let upperBound = max(NSMaxRange(affectedRange), overlappingLinks.map { NSMaxRange($0.fullRange) }.max() ?? NSMaxRange(affectedRange))
         let expandedRange = NSRange(location: location, length: upperBound - location)
         return expandedRange == affectedRange ? nil : expandedRange
+    }
+
+    /// Clamps a caret landing strictly inside an inline image's hidden source to the
+    /// nearest span edge; typing there would silently break the image syntax.
+    func clampedInlineImageSelection(
+        _ proposedRange: NSRange,
+        from previousRange: NSRange,
+        in textView: NSTextView
+    ) -> NSRange {
+        guard proposedRange.length == 0,
+              !isConfiguringBlock,
+              let blockTextView = textView as? BlockInputTextView,
+              blockTextView.rendersInlineImages,
+              textView.string.containsInlineImageCandidate else {
+            return proposedRange
+        }
+        let direction: BlockInputHorizontalMovementDirection = proposedRange.location >= previousRange.location
+            ? .rightward
+            : .leftward
+        guard let clampedOffset = blockTextView.inlineLinkNavigation().clampedInlineImageCaretOffset(
+            proposedRange.location,
+            direction: direction
+        ) else {
+            return proposedRange
+        }
+        return NSRange(location: clampedOffset, length: 0)
+    }
+}
+
+extension String {
+    /// Cheap prefilter so selection changes only pay for inline-image parsing
+    /// when the text can actually contain one.
+    var containsInlineImageCandidate: Bool {
+        contains("![") || range(of: "<img", options: .caseInsensitive) != nil
     }
 }

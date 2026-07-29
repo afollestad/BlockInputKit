@@ -14,6 +14,8 @@ extension BlockInputTextView {
     override func draw(_ dirtyRect: NSRect) {
         drawInlineChipBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
+        // Images paint after super so selection highlight cannot wash them out.
+        drawInlineImages(in: dirtyRect)
     }
 
     /// Returns true for the exact command-click gesture that should open a link immediately.
@@ -334,8 +336,15 @@ extension BlockInputTextView {
             rawSlashCommandChips: rendersRawSlashCommandChips,
             rawFileMentionChips: rendersRawFileMentionChips,
             slashCommandAvailability: blockItem?.slashCommandAvailability ?? .documentStart,
-            isDocumentStartBlock: blockItem?.isDocumentStartBlock == true
+            isDocumentStartBlock: blockItem?.isDocumentStartBlock == true,
+            inlineImages: rendersInlineImages
         )
+    }
+
+    /// Table cells keep alt-label link rendering for image syntax, so their hit
+    /// testing must parse with the same flag their attributes were applied with.
+    var rendersInlineImages: Bool {
+        blockItem?.isTableCellTextView(self) != true
     }
 
     private var supportsInlineMarkdownLinkRendering: Bool {

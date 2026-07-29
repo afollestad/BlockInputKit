@@ -9,7 +9,12 @@ extension BlockInputMarkdownImporter {
               block.kind.supportsImageSyntaxSplitting else {
             return [block]
         }
+        // Images alone on their line become standalone blocks. Remote images sharing
+        // a line with text stay in the source so they can render inline (GitHub
+        // parity); local/relative sources keep splitting because inline rendering
+        // is remote-only and their syntax would otherwise read as raw text.
         let matches = BlockInputImageSyntaxParser.imageMatches(in: block.text)
+            .filter { $0.isAloneOnLine(in: block.text) || !$0.image.source.isRemoteInlineImageSource }
         guard !matches.isEmpty else {
             return [block]
         }
@@ -155,7 +160,7 @@ enum BlockInputImageSyntaxParser {
         }
     }
 
-    private static func htmlImageMatches(in text: String) -> [BlockInputImageMatch] {
+    static func htmlImageMatches(in text: String) -> [BlockInputImageMatch] {
         let pattern = #"<img\b([^>]*)>"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
             return []
@@ -206,6 +211,34 @@ enum BlockInputImageSyntaxParser {
 struct BlockInputImageMatch: Equatable {
     let range: NSRange
     let image: BlockInputImage
+
+    /// True when the match's line contains nothing but the match and whitespace,
+    /// which is what qualifies an image for standalone-block extraction.
+    func isAloneOnLine(in text: String) -> Bool {
+        let nsText = text as NSString
+        guard range.location >= 0, NSMaxRange(range) <= nsText.length else {
+            return false
+        }
+        let lineRange = nsText.lineRange(for: range)
+        let leading = NSRange(location: lineRange.location, length: range.location - lineRange.location)
+        let trailing = NSRange(location: NSMaxRange(range), length: NSMaxRange(lineRange) - NSMaxRange(range))
+        return nsText.isWhitespaceOnly(in: leading) && nsText.isWhitespaceOnly(in: trailing)
+    }
+}
+
+private extension NSString {
+    func isWhitespaceOnly(in range: NSRange) -> Bool {
+        guard range.length > 0 else {
+            return true
+        }
+        for offset in range.location..<NSMaxRange(range) {
+            guard let scalar = UnicodeScalar(character(at: offset)),
+                  CharacterSet.whitespacesAndNewlines.contains(scalar) else {
+                return false
+            }
+        }
+        return true
+    }
 }
 
 private extension Array where Element == BlockInputImageMatch {

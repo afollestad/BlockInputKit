@@ -96,6 +96,34 @@ final class BlockInputMarkdownImageTests: XCTestCase {
         XCTAssertEqual(document.blocks.map(\.text), ["A", "", "B", "", "C"])
     }
 
+    func testRemoteImageSharingLineWithTextStaysInlineSourceText() {
+        let source = "Before ![Alt](https://example.com/image.png) after"
+        let document = BlockInputDocument(markdown: source)
+
+        XCTAssertEqual(document.blocks.map(\.kind), [.paragraph])
+        XCTAssertEqual(document.blocks.map(\.text), [source])
+        XCTAssertEqual(document.markdown, source)
+    }
+
+    func testRemoteHTMLImageSharingLineWithTextStaysInlineSourceText() {
+        let source = "Before <img src=\"https://example.com/image.png\" alt=\"Alt\" /> after"
+        let document = BlockInputDocument(markdown: source)
+
+        XCTAssertEqual(document.blocks.map(\.kind), [.paragraph])
+        XCTAssertEqual(document.blocks.map(\.text), [source])
+    }
+
+    func testRemoteImageAloneOnItsLineSplitsIntoImageBlock() {
+        let document = BlockInputDocument(markdown: "Text\n![Alt](https://example.com/image.png)\nMore")
+
+        XCTAssertEqual(document.blocks.map(\.kind), [
+            .paragraph,
+            .image(BlockInputImage(source: "https://example.com/image.png", altText: "Alt")),
+            .paragraph
+        ])
+        XCTAssertEqual(document.blocks.map(\.text), ["Text", "", "More"])
+    }
+
     func testImageSyntaxInsideUnsupportedBlocksStaysLiteral() {
         let source = """
         ```swift

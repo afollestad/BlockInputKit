@@ -52,6 +52,8 @@ public final class BlockInputView: NSView {
     var allowsRemoteImageLoading = true
     var maximumImageSourceBytes = 20 * 1024 * 1024, maximumImagePixelDimension = 8_192
     var defaultImagePlaceholderAspectRatio: CGFloat = 16.0 / 9.0
+    /// Editor-scoped cache for images rendered inline within text lines.
+    let inlineImageStore = BlockInputInlineImageStore()
 
     let scrollView = BlockInputDocumentScrollView()
     let collectionView = BlockInputCollectionView()
@@ -144,12 +146,14 @@ public final class BlockInputView: NSView {
     public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setupCollectionView()
+        configureInlineImageStoreCallback()
     }
 
     /// Creates an editor view from a coder and installs its collection-view-backed editing surface.
     public required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupCollectionView()
+        configureInlineImageStoreCallback()
     }
 
     deinit {

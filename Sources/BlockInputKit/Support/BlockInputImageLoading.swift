@@ -159,13 +159,27 @@ public actor BlockInputDefaultImageLoader: BlockInputImageLoading {
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = properties[kCGImagePropertyPixelWidth] as? Int,
               let height = properties[kCGImagePropertyPixelHeight] as? Int else {
-            throw BlockInputImageLoadingError.unsupportedImage
+            return try vectorImageDimensions(from: data)
         }
         let orientation = properties[kCGImagePropertyOrientation] as? Int
         if orientation == 5 || orientation == 6 || orientation == 7 || orientation == 8 {
             return BlockInputImageDimensions(width: height, height: width)
         }
         return BlockInputImageDimensions(width: width, height: height)
+    }
+
+    /// ImageIO cannot read vector formats like SVG (common for remote badges), but
+    /// `NSImage` can; fall back to its decoded point size for dimension probing.
+    private static func vectorImageDimensions(from data: Data) throws -> BlockInputImageDimensions {
+        guard let image = NSImage(data: data),
+              image.size.width > 0,
+              image.size.height > 0 else {
+            throw BlockInputImageLoadingError.unsupportedImage
+        }
+        return BlockInputImageDimensions(
+            width: Int(image.size.width.rounded()),
+            height: Int(image.size.height.rounded())
+        )
     }
 }
 

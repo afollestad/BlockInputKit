@@ -54,7 +54,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var selectionBeforeTextChange: BlockInputSelection?
     // Programmatic reuse/configuration can move NSTextView selection; do not
     // report that as user selection, especially on large store-backed docs.
-    private var isConfiguringBlock = false
+    private(set) var isConfiguringBlock = false
     var blockSelectionChrome: BlockInputBlockSelectionChrome = .none
     var temporarySelectionHighlightRange: NSRange?
     var isTrackingBlockSelectionDrag = false
@@ -63,6 +63,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     var renderedCodeColorScheme: BlockInputSyntaxColorScheme?
     var style = BlockInputStyle.default
     var imageLoadingContext = BlockInputImageBlockLoadingContext()
+    weak var inlineImageStore: BlockInputInlineImageStore?
     var fileBaseURL: URL?
     var allowsReordering = true
     var allowsDrops = true
@@ -201,6 +202,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         style: BlockInputStyle = .default,
         blockVerticalInsetMultiplier: CGFloat = 1,
         imageLoadingContext: BlockInputImageBlockLoadingContext = BlockInputImageBlockLoadingContext(),
+        inlineImageStore: BlockInputInlineImageStore? = nil,
         fileBaseURL: URL? = nil,
         isEditable: Bool = true,
         disabledCursor: NSCursor? = nil,
@@ -224,6 +226,7 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         self.blockVerticalInsetMultiplier = BlockInputConfiguration.sanitizedBlockVerticalInsetMultiplier(blockVerticalInsetMultiplier)
         self.style = style
         self.imageLoadingContext = imageLoadingContext
+        self.inlineImageStore = inlineImageStore
         self.fileBaseURL = fileBaseURL
         applySlashCommandConfiguration(
             rawSlashCommandChips: rawSlashCommandChips,
@@ -391,25 +394,6 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
         delegate?.blockItem(self, didChangeSelectionIn: blockID, selectedRange: nil)
     }
 
-    func textView(
-        _ textView: NSTextView,
-        willChangeSelectionFromCharacterRange oldSelectedCharRange: NSRange,
-        toCharacterRange newSelectedCharRange: NSRange
-    ) -> NSRange {
-        guard !isConfiguringBlock,
-              !isUpdatingBlockSelectionDrag,
-              isTrackingBlockSelectionDrag,
-              let event = currentBlockSelectionDragEvent() else {
-            return newSelectedCharRange
-        }
-        let blockTextView = textView as? BlockInputTextView
-        blockTextView?.rememberBlockSelectionDragRange(newSelectedCharRange)
-        guard updateBlockSelectionDrag(with: event, selectedRange: newSelectedCharRange) else {
-            return newSelectedCharRange
-        }
-        return blockTextView?.collapsedBlockSelectionDragNativeRange() ?? oldSelectedCharRange
-    }
-
     private func updateHoverTrackingArea() {
         if let trackingArea {
             view.removeTrackingArea(trackingArea)
@@ -473,6 +457,7 @@ extension BlockInputBlockItem {
         renderedBlock = nil
         delegate = nil
         selectionBeforeTextChange = nil
+        inlineImageStore = nil
         isHorizontalRule = false
         isImageBlock = false
         setBlockSelection(false)

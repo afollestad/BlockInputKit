@@ -102,10 +102,13 @@ extension BlockInputTableView {
             ]
         )
         if appliesInlineMarkdown {
+            // Table cells keep alt-label link rendering for image syntax; the cell
+            // text views have no inline-image draw/measure support yet.
             BlockInputBlockItem.applyInlineMarkdownAttributes(
                 for: BlockInputBlock(kind: .paragraph, text: string),
                 textStorage: storage,
-                style: style
+                style: style,
+                inlineImages: false
             )
         }
         if !isEditable {

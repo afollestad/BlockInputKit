@@ -38,6 +38,7 @@ esac
 if [ "$#" -eq 0 ]; then
   set -- \
     "BlockInputKitTests/BlockInputViewSnapshotTests" \
+    "BlockInputKitTests/BlockInputInlineImageSnapshotTests" \
     "BlockInputKitTests/BlockInputViewReadOnlySnapshotTests"
 fi
 

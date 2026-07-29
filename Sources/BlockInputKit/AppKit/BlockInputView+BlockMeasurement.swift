@@ -22,7 +22,8 @@ extension BlockInputView {
             rawFileMentionChips: rawFileMentionChips,
             slashCommandAvailability: slashCommandAvailability,
             isDocumentStartBlock: isDocumentStartBlock,
-            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+            blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
+            inlineImageSizes: inlineImageStore.sizesSnapshot()
         )
     }
 }

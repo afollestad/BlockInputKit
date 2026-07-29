@@ -221,7 +221,8 @@ extension BlockInputView {
                 rawFileMentionChips: rawFileMentionChips,
                 slashCommandAvailability: slashCommandAvailability,
                 isDocumentStartBlock: index == 0,
-                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier
+                blockVerticalInsetMultiplier: blockVerticalInsetMultiplier,
+                inlineImageSizes: inlineImageStore.sizesSnapshot()
             )
             if let maximumHeight, height >= maximumHeight {
                 return height

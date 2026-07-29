@@ -96,7 +96,12 @@ enum DemoData {
                 altText: "Willriver Falls",
                 width: 480,
                 height: 320
-            )))
+            ))),
+            BlockInputBlock(
+                kind: .paragraph,
+                text: "Remote images sharing a line with text render inline: "
+                    + "**![CI](https://img.shields.io/badge/CI-passing-brightgreen) build status** stays on one line."
+            )
         ]
     }
 }
