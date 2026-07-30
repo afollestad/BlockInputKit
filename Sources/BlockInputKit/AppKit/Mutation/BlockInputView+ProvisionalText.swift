@@ -252,7 +252,9 @@ extension BlockInputView {
         at index: Int,
         authorizedProvisionalSession: BlockInputProvisionalTextSession?
     ) -> Bool {
-        // Image dimensions can resolve or undo after mounting; refresh flow metrics so scroll bounds include the full block height.
+        // Image dimensions can resolve or undo after mounting with an unchanged measured
+        // height, so images force a flow-metrics refresh; other kinds refresh only when
+        // `reconfigureVisibleReplacement` detects the layout's cached height went stale.
         if reconfigureVisibleReplacement(
             block,
             at: index,

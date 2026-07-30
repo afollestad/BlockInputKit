@@ -166,7 +166,11 @@ extension BlockInputView {
             return false
         }
         configureBlockItem(item, block: block, blockIndex: index)
-        if invalidatesLayoutMetrics {
+        // Metrics invalidation re-queries every row's size, so large documents stay on
+        // the cheap frame-only path even when a replacement changes height; their minor
+        // content-size drift is imperceptible against a 10k+ row scroll range.
+        if invalidatesLayoutMetrics
+            || (!shouldDeferGranularCountLayout && flowLayoutHeightIsStale(for: block, at: index)) {
             invalidateLayoutForBlock(at: index, editedItem: item, block: block)
         } else {
             resizeVisibleItem(item, for: block)
@@ -175,6 +179,24 @@ extension BlockInputView {
         restoreMountedSelection()
         invalidatePreferredHeight()
         return true
+    }
+
+    /// Whether the flow layout's cached metric no longer matches the block's
+    /// measured height. Height-changing replacements (a paragraph becoming a
+    /// table, table rows added or removed) must refresh delegate metrics, or
+    /// `collectionViewContentSize` keeps the old height and the scroll range
+    /// clips the block; height-neutral replacements stay on the cheap path.
+    func flowLayoutHeightIsStale(for block: BlockInputBlock, at index: Int) -> Bool {
+        guard let cachedHeight = collectionView.collectionViewLayout?
+            .layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.size.height else {
+            return true
+        }
+        let measuredHeight = measuredBlockItemHeight(
+            for: block,
+            itemWidth: availableBlockItemWidth,
+            isDocumentStartBlock: index == 0
+        )
+        return abs(cachedHeight - measuredHeight) > 0.5
     }
 
     func resizeVisibleItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {

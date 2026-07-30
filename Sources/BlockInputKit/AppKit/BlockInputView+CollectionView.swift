@@ -52,11 +52,7 @@ extension BlockInputView: NSCollectionViewDelegateFlowLayout {
         layout collectionViewLayout: NSCollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> NSSize {
-        let sectionInset = (collectionViewLayout as? NSCollectionViewFlowLayout)?.sectionInset
-            ?? NSEdgeInsetsZero
-        let scrollViewInsets = collectionView.enclosingScrollView?.contentInsets ?? NSEdgeInsetsZero
-        let horizontalInsets = sectionInset.left + sectionInset.right + scrollViewInsets.left + scrollViewInsets.right
-        let availableWidth = max(collectionView.bounds.width - horizontalInsets, 0)
+        let availableWidth = availableBlockItemWidth(for: collectionViewLayout)
         if isProgressiveLoadingIndex(indexPath.item) {
             return NSSize(width: availableWidth, height: progressiveLoadingRowHeight)
         }

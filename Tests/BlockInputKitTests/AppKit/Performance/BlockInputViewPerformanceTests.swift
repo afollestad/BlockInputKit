@@ -391,6 +391,42 @@ final class BlockInputViewPerformanceTests: XCTestCase {
         XCTAssertEqual(mounted.view.selection, .cursor(BlockInputCursor(blockID: quoteID, utf16Offset: 25)))
     }
 
+    func testLargeDocumentTableAppendRowSkipsDelegateMetricsInvalidation() throws {
+        var blocks = [BlockInputBlock(
+            id: "table",
+            kind: .table,
+            text: BlockInputTable.normalized(
+                header: ["H1", "H2"],
+                bodyRows: [["one", "two"]],
+                alignments: [.left, .left]
+            ).markdown
+        )]
+        blocks.append(contentsOf: (0..<largeDocumentCacheMutationLimit).map { BlockInputBlock(text: "Block \($0)") })
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let view = BlockInputView(frame: window.contentView?.bounds ?? window.frame)
+        let layout = TrackingCollectionViewFlowLayout()
+        view.collectionView.collectionViewLayout = layout
+        window.contentView = view
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: blocks)))
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+        let item = try XCTUnwrap(view.collectionView.item(at: IndexPath(item: 0, section: 0)) as? BlockInputBlockItem)
+        let heightBefore = item.view.frame.height
+        layout.reset()
+
+        XCTAssertTrue(view.appendTableBodyRow(blockID: "table"))
+
+        // Height-changing replacements above the large-document limit must stay on the
+        // frame-only path; a delegate-metrics refresh re-measures every row.
+        XCTAssertFalse(layout.didInvalidateDelegateMetrics)
+        XCTAssertGreaterThan(item.view.frame.height, heightBefore)
+    }
+
     func testStoreBackedListInlineReturnInvalidatesFullLayout() throws {
         let context = try typingLayoutTestContext(block: BlockInputBlock(
             id: "second",
@@ -454,29 +490,4 @@ private struct TypingLayoutTestContext {
     let view: BlockInputView
     let layout: TrackingCollectionViewFlowLayout
     let item: BlockInputBlockItem
-}
-
-private final class TrackingCollectionViewFlowLayout: NSCollectionViewFlowLayout {
-    private(set) var invalidatedItemIndexPaths: [IndexPath] = []
-    private(set) var didInvalidateEverything = false
-    private(set) var didInvalidateDelegateMetrics = false
-
-    func reset() {
-        invalidatedItemIndexPaths = []
-        didInvalidateEverything = false
-        didInvalidateDelegateMetrics = false
-    }
-
-    override func invalidateLayout() {
-        didInvalidateEverything = true
-        super.invalidateLayout()
-    }
-
-    override func invalidateLayout(with context: NSCollectionViewLayoutInvalidationContext) {
-        invalidatedItemIndexPaths.append(contentsOf: context.invalidatedItemIndexPaths ?? [])
-        didInvalidateDelegateMetrics =
-            didInvalidateDelegateMetrics
-            || (context as? NSCollectionViewFlowLayoutInvalidationContext)?.invalidateFlowLayoutDelegateMetrics == true
-        super.invalidateLayout(with: context)
-    }
 }
