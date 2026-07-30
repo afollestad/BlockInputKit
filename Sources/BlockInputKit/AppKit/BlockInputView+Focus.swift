@@ -140,7 +140,12 @@ extension BlockInputView {
         guard indexPath.item < collectionView.numberOfItems(inSection: indexPath.section) else {
             return nil
         }
-        collectionView.scrollToItems(at: [indexPath], scrollPosition: .nearestVerticalEdge)
+        // A zero-size clip cannot scroll meaningfully: NSCollectionView pins the
+        // row flush to the clip top, hiding the top section inset behind an
+        // offset that sticks until some later layout pass clamps it.
+        if scrollView.contentView.bounds.height > 0 {
+            collectionView.scrollToItems(at: [indexPath], scrollPosition: .nearestVerticalEdge)
+        }
         collectionView.layoutSubtreeIfNeeded()
         guard let item = collectionView.item(at: indexPath) as? BlockInputBlockItem else {
             return nil

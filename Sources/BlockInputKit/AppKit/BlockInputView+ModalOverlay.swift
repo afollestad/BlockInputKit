@@ -27,6 +27,9 @@ extension BlockInputView {
                 }
                 self.wantsFocusOnWindowAttach = false
                 self.focusEditor()
+                // A pre-attachment focus may have scrolled against stale layout
+                // metrics; nothing else forces a layout pass afterwards.
+                self.clampVerticalScrollOffsetIfNeeded()
             }
         }
     }

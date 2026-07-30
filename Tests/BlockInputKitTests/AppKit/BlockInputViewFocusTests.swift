@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import XCTest
 @testable import BlockInputKit
 
@@ -76,6 +77,133 @@ final class BlockInputViewFocusTests: XCTestCase {
         }
         XCTAssertFalse(view.wantsFocusOnWindowAttach)
         XCTAssertTrue(view.isEditorFirstResponder)
+    }
+
+    func testPreAttachmentFocusDoesNotHideTheTopContentInset() async throws {
+        // Mirrors a SwiftUI editor opened to edit existing text: focusEditor()
+        // runs while the view is windowless with a zero-size clip, where a
+        // scroll-to-item call would scroll the first row flush to the clip top
+        // and permanently hide the top section inset once the window attaches.
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView(frame: .zero)
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: blockID, text: "Comment 1")
+            ]),
+            heightSizing: BlockInputEditorHeightSizing(
+                defaultVisibleLineCount: 2,
+                maximumVisibleLineCount: 10
+            )
+        ))
+
+        view.focusEditor()
+
+        // The window attaches while SwiftUI still has the view at zero size;
+        // the proper height arrives one layout pass later.
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView?.addSubview(view)
+        view.layoutSubtreeIfNeeded()
+        view.focusEditor()
+        for _ in 0..<20 {
+            await Task.yield()
+        }
+
+        let height = view.preferredHeight(forWidth: 400)
+        view.frame = NSRect(x: 0, y: 0, width: 400, height: height)
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+        for _ in 0..<200 {
+            if view.isEditorFirstResponder {
+                break
+            }
+            await Task.yield()
+        }
+
+        XCTAssertEqual(view.scrollView.contentView.bounds.origin.y, 0, accuracy: 0.5)
+    }
+
+    func testSwiftUIEditorFocusKeepsTopInsetVisible() async throws {
+        // The real SwiftUI mount order: the editor mounts unfocused, then the
+        // host's focus request flips the binding true one update later. The
+        // focus claim must not leave the clip scrolled past the top inset.
+        let configuration = Self.chromedHeightSizedConfiguration(markdown: "Comment 1")
+        let focusDriver = FocusDriver()
+        let hosting = NSHostingView(rootView: FocusDrivenEditorHost(
+            configuration: configuration,
+            driver: focusDriver
+        ))
+        hosting.frame = NSRect(x: 0, y: 0, width: 460, height: 90)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 90),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hosting
+        hosting.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+
+        focusDriver.isFocused = true
+        let view = try XCTUnwrap(firstBlockInputView(in: hosting))
+        for _ in 0..<200 {
+            window.displayIfNeeded()
+            if view.isEditorFirstResponder {
+                break
+            }
+            await Task.yield()
+        }
+        for _ in 0..<50 {
+            await Task.yield()
+        }
+        window.displayIfNeeded()
+
+        XCTAssertTrue(view.isEditorFirstResponder)
+        XCTAssertEqual(view.scrollView.contentView.bounds.origin.y, 0, accuracy: 0.5)
+        let firstItem = try XCTUnwrap(view.visibleBlockItemForTesting(at: 0))
+        XCTAssertEqual(firstItem.view.frame.minY, view.editorContentTopInset, accuracy: 0.5)
+    }
+
+    /// A comment-editor-like configuration: chromed surface plus height sizing.
+    private static func chromedHeightSizedConfiguration(markdown: String) -> BlockInputConfiguration {
+        var style = BlockInputStyle.default
+        style.editorSurface = BlockInputEditorSurfaceStyle(
+            editorBackgroundColor: nil,
+            scrollBackgroundColor: nil,
+            collectionBackgroundColor: nil,
+            chrome: BlockInputEditorChromeStyle(
+                fillColor: NSColor.textBackgroundColor.withAlphaComponent(0.55),
+                strokeColor: NSColor.separatorColor,
+                borderWidth: 1,
+                cornerRadius: 8,
+                clipsContentToShape: true
+            )
+        )
+        return BlockInputConfiguration(
+            document: BlockInputDocument(markdown: markdown),
+            placeholder: "Edit this comment",
+            style: style,
+            heightSizing: BlockInputEditorHeightSizing(
+                defaultVisibleLineCount: 2,
+                maximumVisibleLineCount: 10
+            )
+        )
+    }
+
+    private func firstBlockInputView(in view: NSView) -> BlockInputView? {
+        if let match = view as? BlockInputView {
+            return match
+        }
+        for subview in view.subviews {
+            if let match = firstBlockInputView(in: subview) {
+                return match
+            }
+        }
+        return nil
     }
 
     func testResigningFocusCancelsDeferredWindowAttachClaim() {
@@ -333,5 +461,20 @@ private final class FocusCursorRectProbeView: NSView {
     override func addCursorRect(_ rect: NSRect, cursor object: NSCursor) {
         addedCursorRects.append((rect, object))
         super.addCursorRect(rect, cursor: object)
+    }
+}
+
+/// Flips the editor's focus binding after mount, like a host consuming a focus token.
+@MainActor
+private final class FocusDriver: ObservableObject {
+    @Published var isFocused = false
+}
+
+private struct FocusDrivenEditorHost: View {
+    let configuration: BlockInputConfiguration
+    @ObservedObject var driver: FocusDriver
+
+    var body: some View {
+        BlockInputEditor(configuration: configuration, isFocused: $driver.isFocused)
     }
 }
