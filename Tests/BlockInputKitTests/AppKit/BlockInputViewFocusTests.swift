@@ -45,6 +45,52 @@ final class BlockInputViewFocusTests: XCTestCase {
         )
     }
 
+    func testFocusEditorBeforeWindowAttachmentClaimsFocusOnAttach() async throws {
+        // A freshly mounted SwiftUI editor can receive focusEditor() before it
+        // joins a window, where makeFirstResponder is a silent no-op; the claim
+        // must retry (deferred one tick) after attachment.
+        let blockID = BlockInputBlockID(rawValue: "first")
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: blockID, text: "First")
+        ])))
+
+        view.focusEditor()
+        XCTAssertTrue(view.wantsFocusOnWindowAttach)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 720, height: 480),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = view
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+
+        for _ in 0..<200 {
+            if view.isEditorFirstResponder {
+                break
+            }
+            await Task.yield()
+        }
+        XCTAssertFalse(view.wantsFocusOnWindowAttach)
+        XCTAssertTrue(view.isEditorFirstResponder)
+    }
+
+    func testResigningFocusCancelsDeferredWindowAttachClaim() {
+        let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view.configure(BlockInputConfiguration(document: BlockInputDocument(blocks: [
+            BlockInputBlock(id: BlockInputBlockID(rawValue: "first"), text: "First")
+        ])))
+
+        view.focusEditor()
+        XCTAssertTrue(view.wantsFocusOnWindowAttach)
+
+        _ = view.resignEditorFocus()
+        XCTAssertFalse(view.wantsFocusOnWindowAttach)
+    }
+
     func testEditingPublishesFocusChanges() async throws {
         let blockID = BlockInputBlockID(rawValue: "first")
         var focusValues: [Bool] = []

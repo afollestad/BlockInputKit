@@ -99,6 +99,9 @@ public final class BlockInputView: NSView {
     var isDocumentCacheSynchronized = true
     var publishedFocusState = false
     var pendingFocus: BlockInputCursor?
+    // A focusEditor() call before window attachment cannot claim first responder
+    // (makeFirstResponder is a silent no-op); retried on viewDidMoveToWindow.
+    var wantsFocusOnWindowAttach = false
     var lastFocusedBlockID: BlockInputBlockID?
     var selectedHorizontalRuleIndex: Int?
     var preferredNavigationX: CGFloat?

@@ -17,6 +17,18 @@ extension BlockInputView {
             return
         }
         invalidateVisibleCursorRects()
+        if wantsFocusOnWindowAttach {
+            // Deferred one tick so the attach's initial layout pass finishes
+            // first — claiming mid-attach churns collection view constraints.
+            // The flag is re-checked because a resign in between cancels the claim.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.wantsFocusOnWindowAttach, self.window != nil else {
+                    return
+                }
+                self.wantsFocusOnWindowAttach = false
+                self.focusEditor()
+            }
+        }
     }
 
     func hostMutationModal(
