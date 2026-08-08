@@ -14,7 +14,7 @@ struct BlockInputBlockItemHorizontalMetrics {
 
 extension BlockInputBlockItem {
     static let tableSurfaceLeadingInset: CGFloat = textContainerContentLeading
-    static let tableSurfaceTrailingInset: CGFloat = max((2 * textContainerLineFragmentPadding) - tableSurfaceLeadingInset, 0)
+    static let tableSurfaceTrailingInset: CGFloat = tableSurfaceLeadingInset
     private static let minimumWrappingViewportWidth: CGFloat = 24
 
     static func horizontalMetrics(
@@ -61,7 +61,7 @@ extension BlockInputBlockItem {
         }
         let normalScrollViewWidth = clampedItemWidth - scrollViewMinX - scrollViewTrailingInset
         guard normalScrollViewWidth >= minimumWrappingViewportWidth else {
-            return collapsedHorizontalMetrics(for: block, itemWidth: clampedItemWidth)
+            return collapsedHorizontalMetrics(itemWidth: clampedItemWidth)
         }
 
         return BlockInputBlockItemHorizontalMetrics(
@@ -72,15 +72,23 @@ extension BlockInputBlockItem {
             scrollViewLeading: scrollViewLeading,
             scrollViewTrailingInset: scrollViewTrailingInset,
             scrollViewWidth: normalScrollViewWidth,
-            textContainerWidth: max(normalScrollViewWidth - 2 * textContainerLineFragmentPadding, 1),
+            textContainerWidth: wrappingTextWidth(forScrollViewWidth: normalScrollViewWidth),
             glyphLeadingX: scrollViewMinX + textContainerContentLeading
         )
     }
 
-    private static func collapsedHorizontalMetrics(
-        for block: BlockInputBlock,
-        itemWidth: CGFloat
-    ) -> BlockInputBlockItemHorizontalMetrics {
+    /// Room the glyph column gets inside a text scroll view of `scrollViewWidth`.
+    ///
+    /// `NSTextView` keeps `textContainerInset.width` plus the container's line-fragment
+    /// padding — together `textContainerContentLeading` — clear on each side, so measuring
+    /// with only the padding subtracted reports a column 2 × `textContainerInset.width`
+    /// wider than the mounted view wraps at. The block then renders one line taller than
+    /// its measured height and the collection view clips that line.
+    private static func wrappingTextWidth(forScrollViewWidth scrollViewWidth: CGFloat) -> CGFloat {
+        max(scrollViewWidth - 2 * textContainerContentLeading, 1)
+    }
+
+    private static func collapsedHorizontalMetrics(itemWidth: CGFloat) -> BlockInputBlockItemHorizontalMetrics {
         BlockInputBlockItemHorizontalMetrics(
             handleLeading: 0,
             handleWidth: 0,
@@ -89,18 +97,9 @@ extension BlockInputBlockItem {
             scrollViewLeading: 0,
             scrollViewTrailingInset: 0,
             scrollViewWidth: itemWidth,
-            textContainerWidth: collapsedTextContainerWidth(for: block, scrollViewWidth: itemWidth),
+            textContainerWidth: wrappingTextWidth(forScrollViewWidth: itemWidth),
             glyphLeadingX: min(textContainerContentLeading, max(itemWidth - 1, 0))
         )
-    }
-
-    private static func collapsedTextContainerWidth(for block: BlockInputBlock, scrollViewWidth: CGFloat) -> CGFloat {
-        switch block.kind {
-        case .heading, .quote:
-            return max(scrollViewWidth - 2 * textContainerContentLeading, 1)
-        case .paragraph, .code, .horizontalRule, .frontMatter, .bulletedListItem, .numberedListItem, .checklistItem, .table, .image, .rawMarkdown:
-            return max(scrollViewWidth - 2 * textContainerLineFragmentPadding, 1)
-        }
     }
 
     static func horizontalContentTrailingInset(

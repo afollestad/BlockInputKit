@@ -15,10 +15,12 @@ final class BlockInputBlockItem: NSCollectionViewItem, NSTextViewDelegate {
     static let markerGutterWidth: CGFloat = 24
     static let markerChromeWidth: CGFloat = 18
     static let minimumMarkerTextGap: CGFloat = 4
-    // Mirrors the NSTextView inset plus line-fragment padding so external chrome starts at the plain-text glyph column.
-    static let textContainerContentLeading: CGFloat = 9
     // Mirrors NSTextContainer's default line-fragment padding for offscreen width measurement.
     static let textContainerLineFragmentPadding: CGFloat = 5
+    // Room NSTextView keeps between a text scroll view's edge and the glyph column. External
+    // chrome aligns to it and wrap measurement subtracts it from both sides, so it has to stay
+    // derived from the two insets rather than restated.
+    static let textContainerContentLeading: CGFloat = standardTextContainerInset.width + textContainerLineFragmentPadding
     static let markerAlignmentLeading: CGFloat = defaultTextLeading + textContainerContentLeading
     static let listTextLeading: CGFloat = -textContainerContentLeading
     static let quoteBarIdentifier = NSUserInterfaceItemIdentifier("BlockInputQuoteBarView")

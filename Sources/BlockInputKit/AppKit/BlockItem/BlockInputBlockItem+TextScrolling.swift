@@ -27,7 +27,7 @@ extension BlockInputBlockItem {
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: scrollView.contentView.bounds.width, height: CGFloat.greatestFiniteMagnitude)
+        setWrappingContainerWidth(scrollView.contentView.bounds.width)
         scrollView.contentView.scroll(to: .zero)
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
@@ -81,10 +81,7 @@ extension BlockInputBlockItem {
             isCodeBlock = false
         }
         if !isCodeBlock {
-            textView.textContainer?.containerSize = NSSize(
-                width: contentBounds.width,
-                height: CGFloat.greatestFiniteMagnitude
-            )
+            setWrappingContainerWidth(contentBounds.width)
         }
         let fittingHeight = fittingTextHeight(defaultingTo: contentBounds.height)
         let fittingWidth = fittingTextWidth(defaultingTo: contentBounds.width)
@@ -109,6 +106,18 @@ extension BlockInputBlockItem {
             scrollView.contentView.scroll(to: targetOrigin)
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
+    }
+
+    /// Assigns the wrapping container the width `widthTracksTextView` would derive from a
+    /// text view spanning `viewportWidth`. Writing the viewport width straight through
+    /// instead left the container 2 × `textContainerInset.width` too wide until the next
+    /// frame change reset it, so the same block wrapped differently depending on whether
+    /// this layout pass happened to resize the text view.
+    private func setWrappingContainerWidth(_ viewportWidth: CGFloat) {
+        textView.textContainer?.containerSize = NSSize(
+            width: max(viewportWidth - 2 * textView.textContainerInset.width, 1),
+            height: CGFloat.greatestFiniteMagnitude
+        )
     }
 
     private func fittingTextHeight(defaultingTo fallback: CGFloat) -> CGFloat {

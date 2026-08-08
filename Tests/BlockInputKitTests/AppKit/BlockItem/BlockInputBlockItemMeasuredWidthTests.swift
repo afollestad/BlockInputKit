@@ -13,7 +13,7 @@ final class BlockInputBlockItemMeasuredWidthTests: XCTestCase {
                     block: block,
                     allowsReordering: allowsReordering
                 )
-                let expectedMeasuredWidth = expectedScrollWidth - 2 * BlockInputBlockItem.textContainerLineFragmentPadding
+                let expectedMeasuredWidth = expectedScrollWidth - 2 * BlockInputBlockItem.textContainerContentLeading
 
                 XCTAssertEqual(scrollView.frame.width, expectedScrollWidth, accuracy: 0.5, "\(block.kind)")
                 XCTAssertEqual(

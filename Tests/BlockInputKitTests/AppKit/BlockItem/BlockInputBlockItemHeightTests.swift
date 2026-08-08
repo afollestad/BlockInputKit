@@ -77,6 +77,50 @@ final class BlockInputBlockItemHeightTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(measuredHeight, requiredRowHeight, text)
     }
 
+    /// The mounted text container has to wrap exactly where the offscreen measurement
+    /// said it would. Only some widths resize the text view during layout, so a container
+    /// that disagreed with the measurement stayed hidden until a row landed in that band
+    /// and rendered a line the measured height had no room for.
+    @MainActor
+    func testMeasuredHeightCoversMountedRenderingAcrossWrapBoundaries() throws {
+        let block = BlockInputBlock(
+            kind: .numberedListItem(start: 3),
+            text: "Call `read_diff` to read the diff, paging with offset until every file has been read. "
+                + "Judge the change as a whole before commenting on any one of them."
+        )
+        let metrics = BlockInputBlockItem.verticalMetrics(for: block)
+
+        // Rows narrower than roughly 180 measure against `height(for:textWidth:)`'s 120-point
+        // floor rather than their real viewport, so they under-report by design; sweep the
+        // widths an editor actually renders at.
+        for itemWidth in stride(from: 320.0, through: 720.0, by: 2.0) {
+            let measuredHeight = BlockInputBlockItem.height(
+                for: block,
+                textWidth: BlockInputBlockItem.measuredTextWidth(
+                    for: itemWidth,
+                    block: block,
+                    allowsReordering: false
+                )
+            )
+            let item = BlockInputBlockItem.configuredForTesting(
+                block: block,
+                allowsReordering: false,
+                delegate: BlockInputView()
+            )
+            item.view.frame = NSRect(x: 0, y: 0, width: itemWidth, height: measuredHeight)
+            item.view.layoutSubtreeIfNeeded()
+            let textView = try XCTUnwrap(item.testingTextView)
+            let textContainer = try XCTUnwrap(textView.textContainer)
+            let layoutManager = try XCTUnwrap(textView.layoutManager)
+            layoutManager.ensureLayout(for: textContainer)
+            let renderedHeight = ceil(layoutManager.usedRect(for: textContainer).maxY)
+                + metrics.topContentInset
+                + metrics.bottomContentInset
+
+            XCTAssertLessThanOrEqual(renderedHeight, measuredHeight, "item width \(itemWidth)")
+        }
+    }
+
     @MainActor
     func testListHeightAccountsForIndentedTextWidth() {
         let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")

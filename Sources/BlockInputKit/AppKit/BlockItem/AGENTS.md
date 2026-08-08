@@ -11,6 +11,7 @@
 - Keep item height measurement cached or otherwise bounded to visible/layout-requested rows.
 - Keep bare slash-command hint separation matched to one normally rendered ASCII space: following document whitespace must not gain extra kern, while bare hints prepend that literal character without moving the caret or mutating the document. File chips retain adjacent-whitespace spacing.
 - Keep offscreen height measurement in parity with mounted inline-chip fonts and spacing, including raw slash-command availability and document-start rules, so near-boundary wrapping cannot clip a row.
+- Measure wrap width as the text scroll view's width minus `2 * textContainerContentLeading`, and set the mounted container to `viewport - 2 * textContainerInset.width` so it matches what `widthTracksTextView` derives. A container wider than the text view wraps at only survives until the next frame change, so rows clip a rendered line at some widths and not others.
 - When shared row chrome metrics, default insets, or marker alignment change, record and verify the AppKit snapshot suite.
 - Keep table rendered and offscreen measurement in parity: column widths, row heights, padding, borders, header styling, alignments, wrapping, and horizontal scroller reserve must match.
 - Reset table cells, delegates, hover append controls, row-selection chrome, focus state, tracking areas, and horizontal scroll state during item reuse.

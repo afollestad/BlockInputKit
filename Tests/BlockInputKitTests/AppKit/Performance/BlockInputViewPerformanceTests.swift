@@ -229,7 +229,9 @@ final class BlockInputViewPerformanceTests: XCTestCase {
             block,
             BlockInputBlock(id: "third", text: "Third")
         ]))
-        let itemWidth: CGFloat = 220
+        // Narrow enough that one indent step pushes this text past a wrap boundary,
+        // which is the height change the invalidation under test depends on.
+        let itemWidth: CGFloat = 228
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: itemWidth, height: 480))
         let layout = TrackingCollectionViewFlowLayout()
         view.collectionView.collectionViewLayout = layout

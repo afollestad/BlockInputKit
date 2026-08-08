@@ -114,9 +114,17 @@ final class BlockInputBlockItemSelectionChromeTests: XCTestCase {
         )
         let item = multilineListItemForSelectionChromeTesting(block: block, width: 420)
         let renderedTextMaxX = try renderedTextMaxX(in: item)
+        let rawMaxIndentPlusTextWidth = try rawMaxIndentPlusTextWidth(in: item, block: block)
 
         XCTAssertGreaterThanOrEqual(item.testingSelectionBackgroundView.frame.maxX, renderedTextMaxX)
-        XCTAssertEqual(item.testingSelectionBackgroundView.frame.maxX, item.view.bounds.maxX - 6, accuracy: 1.5)
+        XCTAssertEqual(
+            item.testingSelectionBackgroundView.frame.maxX,
+            min(ceil(renderedTextMaxX + 6), item.view.bounds.maxX - 6),
+            accuracy: 1.5
+        )
+        // The unwrapped logical line runs far past the row, so tracking it instead of the
+        // rendered fragments would pin the chrome to the trailing clamp on every width.
+        XCTAssertGreaterThan(rawMaxIndentPlusTextWidth, item.view.bounds.maxX)
     }
 
     func testSelectionChromeUsesConfiguredBackgroundColor() {
