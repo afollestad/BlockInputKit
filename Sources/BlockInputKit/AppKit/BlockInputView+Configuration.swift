@@ -23,6 +23,7 @@ extension BlockInputView {
             && !documentStoreChanged
             && configuredDocumentStore.loadedBlockCount > largeDocumentCacheMutationLimit
         let configuredDocument = reusesLargeDocumentCache ? previousDocument : configuration.document.detachedStorage()
+        let documentChanged = documentStoreChanged || previousDocument != configuredDocument
         document = configuredDocument
         isDocumentCacheSynchronized = reusesLargeDocumentCache ? wasDocumentCacheSynchronized : true
         reconcileProvisionalTextReplacementAfterConfiguration()
@@ -40,7 +41,7 @@ extension BlockInputView {
         configureCommandDispatcher(configuration.commandDispatcher)
         keyboardShortcuts = configuration.keyboardShortcuts
         configureCompletion(configuration)
-        if documentStoreChanged || previousDocument != configuredDocument {
+        if documentChanged {
             dismissCompletionPopup()
             cancelFileDropTasks()
         }
@@ -52,7 +53,7 @@ extension BlockInputView {
         hideDropIndicator()
         invalidateReadOnlyCursorRects()
         clearStaleFocusState()
-        reloadConfiguredDocument(restoresFocus: restoresFocus)
+        reloadConfiguredDocument(restoresFocus: restoresFocus, reusesMountedItems: previousDocumentStore != nil && !documentChanged)
         attachDocumentStoreObservationIfNeeded()
         invalidatePreferredHeight()
     }
@@ -87,12 +88,67 @@ extension BlockInputView {
         configureHeightSizing(configuration.heightSizing)
     }
 
-    private func reloadConfiguredDocument(restoresFocus: Bool) {
+    /// Brings the collection view in line with the configuration just applied.
+    ///
+    /// A first configuration has to populate the collection view and a swapped store or a changed
+    /// document has to rebuild it; every other call can reuse the rows already mounted. The store
+    /// pushes its own changes through `handleDocumentStoreChange`, so nothing depends on this path
+    /// to notice them.
+    ///
+    /// A SwiftUI host rebuilds its `BlockInputConfiguration` on every `body` pass, so most
+    /// `updateNSView` calls arrive with an unchanged document. Reloading anyway is worse than
+    /// wasted work: `reloadData` hides every mounted cell for reuse, and hiding the cell holding
+    /// first responder sends AppKit on a window-wide `nextValidKeyView` search that re-enters
+    /// SwiftUI's in-flight graph update through a sibling `NSHostingView`. AttributeGraph reports
+    /// that as a dependency cycle, and printing the cycle can hang the main thread for tens of
+    /// seconds. Refreshing the mounted items applies the same configuration without recycling one.
+    private func reloadConfiguredDocument(restoresFocus: Bool, reusesMountedItems: Bool) {
+        if reusesMountedItems, refreshMountedItemsForConfiguration() {
+            return
+        }
         if restoresFocus {
             reloadDataKeepingFocus()
         } else {
             reloadDataWithoutRestoringFocus()
         }
+    }
+
+    /// Reapplies the configuration to the already-mounted items, reporting `false` when the mounted
+    /// row count no longer matches the data source and only a reload can reconcile it.
+    ///
+    /// Every setting a reload would push into a cell — style, insets, editability, chip rendering,
+    /// inline hints — reaches it through `configureBlockItem` just the same, at the cost of the
+    /// visible rows rather than the whole document. Rows scrolled out of view are configured when
+    /// they mount, so they pick the same values up then.
+    ///
+    /// No focus restore belongs here: `BlockInputBlockItem.configure` reassigns `textView.string`
+    /// only when the text differs, so an unchanged document leaves every caret, text selection, and
+    /// the window's first responder exactly where the user left them.
+    private func refreshMountedItemsForConfiguration() -> Bool {
+        // With no rows mounted there is nothing to refresh and nothing a reload would fix either:
+        // the data source is queried from scratch on the first layout that mounts a row. Skipping
+        // the row-count guard here also keeps the reconfiguration free of document-store reads.
+        let mountedItems = collectionView.visibleItems()
+        if !mountedItems.isEmpty {
+            guard collectionView.numberOfItems(inSection: 0) == blockCount + (showsProgressiveLoadingRow ? 1 : 0) else {
+                return false
+            }
+            for item in mountedItems {
+                if let loadingItem = item as? BlockInputLoadingItem {
+                    loadingItem.configure(error: progressiveStoreError, surfaceStyle: style.editorSurface)
+                    continue
+                }
+                guard let blockItem = item as? BlockInputBlockItem,
+                      let index = collectionView.indexPath(for: item)?.item,
+                      let block = block(at: index) else {
+                    continue
+                }
+                configureBlockItem(blockItem, block: block, blockIndex: index)
+            }
+            collectionView.collectionViewLayout?.invalidateLayout()
+        }
+        updatePlaceholderVisibility()
+        return true
     }
 
     private func configureCommandDispatcher(_ dispatcher: BlockInputEditorCommandDispatcher?) {
