@@ -36,6 +36,62 @@ final class BlockInputHeightSizingRegressionTests: XCTestCase {
         XCTAssertEqual(mounted.view.scrollView.contentView.bounds.minY, 0, accuracy: 0.5)
     }
 
+    func testResizedDocumentDropsItsScrollRangeAfterContentShrinks() async throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: String(repeating: "wrapping paragraph text ", count: 6))
+            ]),
+            editorVerticalInset: 10,
+            blockVerticalInsetMultiplier: 0.7,
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 9)
+        ), size: NSSize(width: 360, height: 200))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.string = "One"
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        await Task.yield()
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+
+        // The document frame used to ratchet upward, so deleting the wrapped lines left a scroll
+        // range for content that no longer existed and a two-line editor still scrolled.
+        XCTAssertLessThanOrEqual(
+            mounted.view.collectionView.frame.height,
+            mounted.view.scrollView.contentSize.height + 0.5
+        )
+        XCTAssertTrue(mounted.view.scrollView.verticalScroller?.isHidden ?? true)
+        XCTAssertEqual(mounted.view.scrollView.contentView.bounds.minY, 0, accuracy: 0.5)
+        XCTAssertEqual(mounted.view.scrollView.verticalScrollElasticity, .none)
+    }
+
+    func testFixedViewportDocumentUnscrollsAfterContentShrinks() async throws {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "One\nTwo\nThree\nFour\nFive\nSix")]),
+            editorVerticalInset: 10,
+            blockVerticalInsetMultiplier: 0.7
+        ), size: NSSize(width: 360, height: 80))
+        let scrollView = mounted.view.scrollView
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+        let bottomOffset = max(0, mounted.view.collectionView.frame.height - scrollView.contentSize.height)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: bottomOffset))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        XCTAssertGreaterThan(scrollView.contentView.bounds.minY, 0)
+        XCTAssertEqual(scrollView.verticalScrollElasticity, .allowed)
+
+        // Nothing resizes the viewport here, so neither of the scroll view's own hooks fires and
+        // the editor has to reconcile the shrink on its own once the text change has unwound.
+        textView.string = "One"
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        await Task.yield()
+
+        XCTAssertLessThanOrEqual(mounted.view.collectionView.frame.height, scrollView.contentSize.height + 0.5)
+        XCTAssertTrue(scrollView.verticalScroller?.isHidden ?? true)
+        XCTAssertEqual(scrollView.contentView.bounds.minY, 0, accuracy: 0.5)
+        XCTAssertEqual(scrollView.verticalScrollElasticity, .none)
+    }
+
     func testInlineNewlineKeepsCaretVisibleWhileHostHeightAnimates() throws {
         let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
             document: BlockInputDocument(blocks: [BlockInputBlock(id: "first", text: "One\nTwo\nThree")]),

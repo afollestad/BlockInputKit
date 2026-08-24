@@ -59,6 +59,15 @@ extension BlockInputView {
         guard heightSizing != nil else {
             return
         }
+        clampVerticalScrollOffsetToDocumentBounds()
+    }
+
+    /// Pulls a scrolled-past-the-end offset back to the document's maximum.
+    ///
+    /// Unlike `clampVerticalScrollOffsetIfNeeded()` this ignores `heightSizing`: a document that
+    /// just shrank leaves a stale offset whether or not the host sizes the editor in visible
+    /// lines, and clamping to the content maximum is correct either way.
+    func clampVerticalScrollOffsetToDocumentBounds() {
         let contentHeight = currentDocumentContentHeight()
         let maximumY = max(0, contentHeight - scrollView.contentSize.height)
         let origin = scrollView.contentView.bounds.origin

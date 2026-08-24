@@ -237,11 +237,20 @@ public struct BlockInputTextStyle: @unchecked Sendable {
     public var font: NSFont?
     /// Base foreground color. When nil, the editor uses the system label color.
     public var foregroundColor: NSColor?
+    /// Extra space TextKit puts in the gaps *between* the line fragments of a wrapping text block.
+    ///
+    /// Nothing is added after the last line, so a one-line row and the empty document keep their
+    /// heights and an editor sized in visible lines keeps its resting height; only wrapped or
+    /// multi-line blocks grow, by slightly less than this value per gap. Code and table blocks are
+    /// excluded so their metrics keep matching the measurement paths that never see this style;
+    /// `BlockInputBlockItem.lineSpacing(for:style:)` owns that split.
+    public var lineSpacing: CGFloat
 
     /// Creates normal text styling overrides.
-    public init(font: NSFont? = nil, foregroundColor: NSColor? = nil) {
+    public init(font: NSFont? = nil, foregroundColor: NSColor? = nil, lineSpacing: CGFloat = 0) {
         self.font = font
         self.foregroundColor = foregroundColor
+        self.lineSpacing = max(0, lineSpacing)
     }
 }
 

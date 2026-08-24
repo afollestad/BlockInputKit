@@ -45,6 +45,7 @@ public final class BlockInputView: NSView {
     public internal(set) var blockVerticalInsetMultiplier: CGFloat = 1
     var heightSizing: BlockInputEditorHeightSizing?, lastReportedPreferredHeight: CGFloat?
     var isPreferredHeightCallbackScheduled = false
+    var isFlowLayoutShrinkSyncScheduled = false
     var imageLoader: any BlockInputImageLoading = BlockInputDefaultImageLoader()
     var imageDiskCache: (any BlockInputImageDiskCaching)?
     var imageBaseURL: URL?, fileBaseURL: URL?

@@ -13,6 +13,11 @@ final class BlockInputCollectionView: NSCollectionView {
         blockInputView?.updateVisibleItemWidthsForCurrentWidth()
         blockInputView?.scheduleProgressivePreloadCheck()
         blockInputView?.updatePlaceholderLayout()
+        // A content shrink with no host resize reaches neither of the scroll view's own hooks, so
+        // hand the frame write to the scroll view rather than mutating our own frame mid-layout.
+        if blockInputView?.hasStaleDocumentHeight == true {
+            enclosingScrollView?.needsLayout = true
+        }
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {

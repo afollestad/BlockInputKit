@@ -18,6 +18,28 @@ extension BlockInputViewSnapshotTests {
         return view
     }
 
+    /// A chip on a wrapped, line-spaced paragraph: the case where the gap between the chip fill
+    /// and the next line's glyphs is what the spacing is meant to open up.
+    func makeLineSpacedFileChipSnapshotView(for snapshotCase: FileChipSnapshotCase) -> NSView {
+        let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
+        view.appearance = NSAppearance(named: snapshotCase.appearance)
+        view.configure(BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(
+                    id: "paragraph",
+                    text: "Linked [../README.md](<file:///tmp/README.md>) from the launch folder, "
+                        + "with enough trailing prose to wrap onto a second and third rendered line."
+                )
+            ]),
+            allowsBlockReordering: false,
+            dropIndicatorColor: .systemBlue,
+            style: BlockInputStyle(baseText: BlockInputTextStyle(lineSpacing: 3))
+        ))
+        view.layoutSubtreeIfNeeded()
+        view.collectionView.layoutSubtreeIfNeeded()
+        return view
+    }
+
     func makeSelectedFileChipSnapshotView(for snapshotCase: FileChipSnapshotCase) -> NSView {
         let view = BlockInputView(frame: NSRect(origin: .zero, size: snapshotCase.size))
         view.appearance = NSAppearance(named: snapshotCase.appearance)

@@ -136,6 +136,11 @@ foreground color instead of the system link text color.
 the editor's outer `editorVerticalInset`. `1` preserves the built-in spacing, values below `1` make rows denser, and
 values above `1` add more breathing room.
 
+`baseText.lineSpacing` opens up the gaps between the rendered lines of a wrapping block — paragraphs, headings, quotes,
+list items, and raw Markdown. Code and table blocks are excluded so their metrics keep matching the measurement paths
+that never see it. TextKit adds nothing after a block's last line, so one-line rows, the empty document, and the visible
+line counts below are unaffected; only wrapped or multi-line blocks get taller.
+
 ### Placeholder
 
 Use `placeholder` for subtle empty-editor text. The placeholder is visual only; it is not inserted into the document,
@@ -196,6 +201,10 @@ Height sizing is opt-in. When enabled, the editor reports a rendered-content pre
 visible line count, grows as content wraps or new blocks are added, and caps at a maximum visible line count when supplied.
 Visible line counts are measured as one-line paragraph row equivalents, so `defaultVisibleLineCount: 3` leaves room for
 three paragraph blocks created by Return. Extra content remains in the editor and scrolls vertically.
+
+Only overflowing content scrolls: the document view tracks the height its content needs in both directions, and vertical
+scroll elasticity is disabled while everything fits, so deleting a wrapped line leaves no scroll range or rubber-banding
+behind.
 
 ```swift
 let configuration = BlockInputConfiguration(

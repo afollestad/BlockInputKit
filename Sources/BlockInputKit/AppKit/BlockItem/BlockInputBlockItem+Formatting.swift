@@ -61,6 +61,22 @@ extension BlockInputBlockItem {
         }
     }
 
+    /// Single owner of which block kinds carry `BlockInputTextStyle.lineSpacing`.
+    ///
+    /// Rendering and every offscreen measurement path read this, so they cannot drift.
+    /// Code keeps its own monospace rhythm and horizontal-scroll geometry, and table
+    /// cells measure through `BlockInputTableView+Measurement.swift`, which never sees
+    /// the paragraph style this spacing rides on — spacing either would render taller
+    /// than it measures.
+    static func lineSpacing(for kind: BlockInputBlockKind, style: BlockInputStyle) -> CGFloat {
+        switch kind {
+        case .paragraph, .heading, .quote, .bulletedListItem, .numberedListItem, .checklistItem, .rawMarkdown:
+            return max(0, style.baseText.lineSpacing)
+        case .code, .table, .frontMatter, .horizontalRule, .image:
+            return 0
+        }
+    }
+
     static func contentIndent(for block: BlockInputBlock) -> CGFloat {
         guard block.kind.supportsIndentation,
               block.lineIndentationLevels.isEmpty else {
@@ -270,6 +286,7 @@ extension BlockInputBlockItem {
         textStorage.removeAttribute(.blockInputInlineImage, range: fullRange)
         textStorage.removeAttribute(.blockInputHiddenDelimiter, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
+        applyBaseParagraphStyle(for: block, textStorage: textStorage, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
         applyLineIndentationAttributes(for: block, textStorage: textStorage)
         applyInlineMarkdownAttributes(for: block, textStorage: textStorage)
@@ -315,11 +332,19 @@ extension BlockInputBlockItem {
                 baseFont: font
             )
         }
+        let lineSpacing = Self.lineSpacing(for: block.kind, style: style)
         if block.kind.supportsIndentation, !block.lineIndentationLevels.isEmpty {
             let lineIndex = block.lineIndex(containingUTF16Offset: textView.selectedRange().location)
             let paragraphStyle = Self.paragraphStyle(
-                indentationLevel: block.indentationLevel(forLine: lineIndex)
+                indentationLevel: block.indentationLevel(forLine: lineIndex),
+                lineSpacing: lineSpacing
             )
+            attributes[.paragraphStyle] = paragraphStyle
+            textView.defaultParagraphStyle = paragraphStyle
+        } else if lineSpacing > 0 {
+            // `defaultParagraphStyle` is what the extra line fragment lays out with, so an
+            // empty block only measures the way it renders when the spacing lives here too.
+            let paragraphStyle = Self.paragraphStyle(indentationLevel: 0, lineSpacing: lineSpacing)
             attributes[.paragraphStyle] = paragraphStyle
             textView.defaultParagraphStyle = paragraphStyle
         } else {
@@ -335,137 +360,48 @@ extension BlockInputBlockItem {
         updateMarkerLineYOffsets()
     }
 
+    /// Carries `lineSpacing` on kinds that opt into it, including the unindented ones the
+    /// per-line indentation pass below skips.
+    private func applyBaseParagraphStyle(for block: BlockInputBlock, textStorage: NSTextStorage, range: NSRange) {
+        let lineSpacing = Self.lineSpacing(for: block.kind, style: style)
+        guard lineSpacing > 0 else {
+            return
+        }
+        textStorage.addAttribute(
+            .paragraphStyle,
+            value: Self.paragraphStyle(indentationLevel: 0, lineSpacing: lineSpacing),
+            range: range
+        )
+    }
+
     private func applyLineIndentationAttributes(for block: BlockInputBlock, textStorage: NSTextStorage) {
         guard block.kind.supportsIndentation,
               !block.lineIndentationLevels.isEmpty else {
             return
         }
+        let lineSpacing = Self.lineSpacing(for: block.kind, style: style)
         let text = textStorage.string as NSString
         var offset = 0
         var lineIndex = 0
         while offset < text.length {
             let lineRange = text.lineRange(for: NSRange(location: offset, length: 0))
-            let paragraphStyle = Self.paragraphStyle(indentationLevel: block.indentationLevel(forLine: lineIndex))
+            let paragraphStyle = Self.paragraphStyle(
+                indentationLevel: block.indentationLevel(forLine: lineIndex),
+                lineSpacing: lineSpacing
+            )
             textStorage.addAttribute(.paragraphStyle, value: paragraphStyle, range: lineRange)
             offset = NSMaxRange(lineRange)
             lineIndex += 1
         }
     }
 
-    private static func paragraphStyle(indentationLevel: Int) -> NSParagraphStyle {
+    static func paragraphStyle(indentationLevel: Int, lineSpacing: CGFloat) -> NSParagraphStyle {
         let paragraphStyle = NSMutableParagraphStyle()
         let indent = contentIndent(forIndentationLevel: indentationLevel)
         paragraphStyle.firstLineHeadIndent = indent
         paragraphStyle.headIndent = indent
+        paragraphStyle.lineSpacing = max(0, lineSpacing)
         return paragraphStyle
-    }
-
-    func updateMarkerLineYOffsets() {
-        guard !kindLabel.markerLines.isEmpty,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else {
-            kindLabel.setMarkerLineYOffsets([])
-            return
-        }
-        layoutManager.ensureLayout(for: textContainer)
-        let textLength = (textView.string as NSString).length
-        let lineStarts = BlockInputLineBreaks.lineStartOffsets(in: textView.string)
-        let metrics = lineStarts.prefix(kindLabel.markerLines.count).enumerated().map { lineIndex, lineStart in
-            let lineFragment = markerAlignmentRect(
-                lineIndex: lineIndex,
-                lineStart: lineStart,
-                textLength: textLength,
-                layoutManager: layoutManager
-            )
-            let textPoint = NSPoint(x: 0, y: textView.textContainerOrigin.y + lineFragment.minY)
-            let itemPoint = textView.convert(textPoint, to: view)
-            let markerPoint = kindLabel.convert(itemPoint, from: view)
-            return (yOffset: markerPoint.y, height: lineFragment.height)
-        }
-        kindLabel.setMarkerLineMetrics(
-            yOffsets: metrics.map(\.yOffset),
-            heights: metrics.map(\.height)
-        )
-    }
-
-    func updateQuoteBarVerticalExtent() {
-        guard renderedBlock?.kind == .quote,
-              !quoteBarView.isHidden,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else {
-            quoteBarTopConstraint?.constant = Self.quoteBarVerticalInset
-            quoteBarBottomConstraint?.constant = -Self.quoteBarVerticalInset
-            return
-        }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let textRect = layoutManager.usedRect(for: textContainer).offsetBy(
-            dx: textView.textContainerOrigin.x,
-            dy: textView.textContainerOrigin.y
-        )
-        guard !textRect.isEmpty else {
-            quoteBarTopConstraint?.constant = Self.quoteBarVerticalInset
-            quoteBarBottomConstraint?.constant = -Self.quoteBarVerticalInset
-            return
-        }
-
-        let itemTextRect = textView.convert(textRect, to: view)
-        let quoteBarHeight = min(
-            max(Self.minimumQuoteBarHeight, itemTextRect.height),
-            max(0, view.bounds.height - Self.quoteBarVerticalInset * 2)
-        )
-        let textMidY = quoteBarAlignmentRect(
-            itemTextRect: itemTextRect,
-            layoutManager: layoutManager,
-            textContainer: textContainer
-        ).midY
-        let quoteBarMinY = min(
-            max(view.bounds.minY + Self.quoteBarVerticalInset, textMidY - quoteBarHeight / 2),
-            view.bounds.maxY - Self.quoteBarVerticalInset - quoteBarHeight
-        )
-        let quoteBarMaxY = quoteBarMinY + quoteBarHeight
-        let topInset = max(Self.quoteBarVerticalInset, view.bounds.maxY - quoteBarMaxY)
-        let bottomInset = max(Self.quoteBarVerticalInset, quoteBarMinY - view.bounds.minY)
-        quoteBarTopConstraint?.constant = topInset
-        quoteBarBottomConstraint?.constant = -bottomInset
-        quoteBarView.frame.origin.y = quoteBarMinY
-        quoteBarView.frame.size.height = quoteBarHeight
-    }
-
-    private func quoteBarAlignmentRect(
-        itemTextRect: NSRect,
-        layoutManager: NSLayoutManager,
-        textContainer: NSTextContainer
-    ) -> NSRect {
-        let glyphRange = layoutManager.glyphRange(for: textContainer)
-        guard glyphRange.length > 0,
-              layoutManager.lineFragmentCount(in: glyphRange) == 1 else {
-            return itemTextRect
-        }
-        let firstLineRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphRange.location, effectiveRange: nil).offsetBy(
-            dx: textView.textContainerOrigin.x,
-            dy: textView.textContainerOrigin.y
-        )
-        return textView.convert(firstLineRect, to: view)
-    }
-
-    private func markerAlignmentRect(
-        lineIndex: Int,
-        lineStart: Int,
-        textLength: Int,
-        layoutManager: NSLayoutManager
-    ) -> NSRect {
-        guard textLength > 0, lineStart < textLength else {
-            let extraLineFragmentRect = layoutManager.extraLineFragmentRect
-            guard !extraLineFragmentRect.isEmpty else {
-                let font = Self.font(for: renderedBlock?.kind ?? .paragraph, style: style)
-                let lineHeight = ceil(font.ascender - font.descender + font.leading)
-                return NSRect(x: 0, y: CGFloat(lineIndex) * lineHeight, width: 0, height: lineHeight)
-            }
-            return extraLineFragmentRect
-        }
-        let glyphIndex = layoutManager.glyphIndexForCharacter(at: lineStart)
-        return layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: nil)
     }
 
     func foregroundColor(for kind: BlockInputBlockKind) -> NSColor {
@@ -483,18 +419,5 @@ extension BlockInputBlockItem {
             return style.baseText.foregroundColor
         }
         return readOnlyForegroundColor(style.baseText.foregroundColor ?? .labelColor, for: kind)
-    }
-}
-
-private extension NSLayoutManager {
-    func lineFragmentCount(in glyphRange: NSRange) -> Int {
-        var lineCount = 0
-        enumerateLineFragments(forGlyphRange: glyphRange) { _, _, _, _, stop in
-            lineCount += 1
-            if lineCount > 1 {
-                stop.pointee = true
-            }
-        }
-        return lineCount
     }
 }

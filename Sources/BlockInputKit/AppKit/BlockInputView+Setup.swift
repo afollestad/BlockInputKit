@@ -64,7 +64,7 @@ extension BlockInputView {
     }
 
     private func handleDocumentScrollContentBoundsChange() {
-        updateCollectionViewWidthForVisibleBounds()
+        syncCollectionViewDocumentSizeForVisibleBounds()
         scheduleProgressivePreloadCheck()
         dismissCompletionPopup()
     }

@@ -376,13 +376,18 @@ extension BlockInputTextView {
         var glyphIndex = glyphRange.location
         while glyphIndex < NSMaxRange(glyphRange) {
             var lineGlyphRange = NSRange()
-            let lineFragmentUsedRect = layoutManager.lineFragmentUsedRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
+            // Glyph box, not the used rect: line spacing rides below the glyphs, so centering on
+            // the padded rect would drop the fill half a spacing below its own text.
+            let glyphLineRect = layoutManager.blockInputGlyphLineRect(forGlyphAt: glyphIndex, effectiveRange: &lineGlyphRange)
             let lineChipGlyphRange = NSIntersectionRange(glyphRange, lineGlyphRange)
             if lineChipGlyphRange.length > 0 {
                 let labelRect = layoutManager.boundingRect(forGlyphRange: lineChipGlyphRange, in: textContainer)
                 let verticalPadding: CGFloat = 2
-                let visualHeight = max(baseLineHeight, labelRect.height) + (verticalPadding * 2)
-                let visualY = lineFragmentUsedRect.midY - (visualHeight / 2)
+                // `boundingRect(forGlyphRange:in:)` reports the line fragment's height, which line
+                // spacing inflates, so clamp it to the glyph box before it can grow the fill.
+                let labelHeight = min(labelRect.height, glyphLineRect.height)
+                let visualHeight = max(baseLineHeight, labelHeight) + (verticalPadding * 2)
+                let visualY = glyphLineRect.midY - (visualHeight / 2)
 
                 rects.append(NSRect(
                     x: labelRect.minX + drawingOffset.x - 2,

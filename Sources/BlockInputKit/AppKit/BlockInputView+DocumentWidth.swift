@@ -1,22 +1,61 @@
 import AppKit
 
 extension BlockInputView {
-    func updateCollectionViewWidthForVisibleBounds() {
+    /// Matches the document view to the viewport width and to the height its content needs.
+    ///
+    /// The height write used to be `max(frame.height, visibleHeight)` behind a width-only guard,
+    /// so the document frame ratcheted upward: deleting a wrapped line left the taller frame in
+    /// place and the editor kept a scroll range for content that no longer existed. The height is
+    /// now recomputed from the layout's content size and may shrink, floored at the viewport so a
+    /// scrolling document is never pulled out from under the user.
+    ///
+    /// This runs from the clip view's `boundsDidChange` observer, which fires on every scroll
+    /// tick, so the no-op guard must be evaluated before any frame write — an unguarded write
+    /// re-triggers layout and loops.
+    func syncCollectionViewDocumentSizeForVisibleBounds() {
         let visibleWidth = max(scrollView.contentView.bounds.width, 0)
-        guard visibleWidth > 0,
-              abs(collectionView.frame.width - visibleWidth) > 0.5 || abs(collectionView.bounds.width - visibleWidth) > 0.5 else {
+        guard visibleWidth > 0 else {
             return
         }
         let visibleHeight = max(scrollView.contentView.bounds.height, 0)
+        let widthChanged = abs(collectionView.frame.width - visibleWidth) > 0.5
+            || abs(collectionView.bounds.width - visibleWidth) > 0.5
+        let targetHeight = targetDocumentHeight(forVisibleHeight: visibleHeight)
+        let isShrinkingHeight = collectionView.frame.height - targetHeight > 0.5
+        let heightChanged = isShrinkingHeight || targetHeight - collectionView.frame.height > 0.5
+        updateDocumentScrollElasticity(contentHeight: targetHeight, visibleHeight: visibleHeight)
+        guard widthChanged || heightChanged else {
+            return
+        }
         var frame = collectionView.frame
-        frame.size.width = visibleWidth
-        frame.size.height = max(frame.height, visibleHeight)
+        frame.size.width = widthChanged ? visibleWidth : frame.width
+        frame.size.height = targetHeight
         collectionView.frame = frame
-        collectionView.collectionViewLayout?.invalidateLayout()
-        updateVisibleItemWidthsForCurrentWidth()
         collectionView.needsLayout = true
-        updatePlaceholderLayout()
-        invalidatePreferredHeight()
+        // Width changes rewrap every row; a height-only reconciliation must not invalidate the
+        // preferred height, which is derived from the same content metrics every mutation path
+        // already invalidates from — doing it here would feed a layout pass back into itself.
+        if widthChanged {
+            collectionView.collectionViewLayout?.invalidateLayout()
+            updateVisibleItemWidthsForCurrentWidth()
+            updatePlaceholderLayout()
+            invalidatePreferredHeight()
+        }
+        if isShrinkingHeight {
+            // Nothing else clamps on the scroll path, so a stale offset would otherwise stay
+            // parked until the next layout pass.
+            clampVerticalScrollOffsetToDocumentBounds()
+        }
+    }
+
+    /// True when the document view's height no longer matches what its content needs, in either
+    /// direction.
+    ///
+    /// Lets a layout pass that cannot safely write the frame — the document view's own
+    /// `layout()` — defer the write to the scroll view instead.
+    var hasStaleDocumentHeight: Bool {
+        let visibleHeight = max(scrollView.contentView.bounds.height, 0)
+        return abs(collectionView.frame.height - targetDocumentHeight(forVisibleHeight: visibleHeight)) > 0.5
     }
 
     func updateVisibleItemWidthsForCurrentWidth() {
@@ -52,6 +91,26 @@ extension BlockInputView {
             indexedItem.item.view.layoutSubtreeIfNeeded()
         }
         reflowVisibleItemsAfterHeightChange(startingAt: firstIndex)
+    }
+
+    /// Height the document view needs, floored at the viewport.
+    ///
+    /// Deliberately not `currentDocumentContentHeight()`: that one maxes with the scroll view's
+    /// content size, which is the very pin this reconciliation exists to remove.
+    private func targetDocumentHeight(forVisibleHeight visibleHeight: CGFloat) -> CGFloat {
+        let layoutHeight = collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
+        return max(layoutHeight, visibleHeight)
+    }
+
+    /// Rubber-banding reads as "the editor scrolls" on a document that fits, and every nested
+    /// scroll view already opts out, so elasticity follows whether the content overflows.
+    private func updateDocumentScrollElasticity(contentHeight: CGFloat, visibleHeight: CGFloat) {
+        let overflows = contentHeight - visibleHeight > 0.5
+        let elasticity: NSScrollView.Elasticity = overflows ? .allowed : .none
+        guard scrollView.verticalScrollElasticity != elasticity else {
+            return
+        }
+        scrollView.verticalScrollElasticity = elasticity
     }
 
     private func currentCollectionItemWidth() -> CGFloat {

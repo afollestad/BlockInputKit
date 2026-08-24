@@ -95,6 +95,7 @@ extension BlockInputBlockItem {
             containsInlineChip: inlineMarkdownRanges.contains { $0.inlineChipKind(in: text) != nil },
             containsInlineImage: inlineMarkdownRanges.contains { $0.style == .inlineImage },
             frontMatterReserve: frontMatterReserve,
+            lineSpacing: lineSpacing(for: block.kind, style: configuration.style),
             style: configuration.style,
             block: block,
             fileBaseURL: configuration.fileBaseURL,
@@ -131,6 +132,8 @@ extension BlockInputBlockItem {
            isShortSingleLine(context.text, likelyFitting: context.availableTextWidth, font: context.font) {
             return max(
                 context.metrics.minimumHeight + context.frontMatterReserve,
+                // No spacing term: TextKit puts `lineSpacing` between lines only, so a
+                // single-line row measures exactly as it renders.
                 singleLineTextHeight(font: context.font)
                     + context.metrics.topContentInset
                     + context.metrics.bottomContentInset
@@ -138,11 +141,7 @@ extension BlockInputBlockItem {
                     + 2
             )
         }
-        let boundingRect = (context.text as NSString).boundingRect(
-            with: NSSize(width: context.availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading],
-            attributes: [.font: context.font]
-        )
+        let boundingHeight = boundingRectHeight(context)
         let textKitHeight = textKitHeight(
             for: context.text,
             width: context.availableTextWidth,
@@ -150,6 +149,7 @@ extension BlockInputBlockItem {
             hiddenDelimiterRanges: context.hiddenDelimiterRanges,
             inlineCodeRanges: context.inlineCodeRanges,
             style: context.style,
+            lineSpacing: context.lineSpacing,
             inlineChipMeasurement: context.containsInlineChip || context.containsInlineImage
                 ? BlockInputInlineChipHeightMeasurement(
                     block: context.block,
@@ -164,7 +164,7 @@ extension BlockInputBlockItem {
                 : nil
         )
         let measuredTextHeight = context.hiddenDelimiterRanges.isEmpty
-            ? max(ceil(boundingRect.height), textKitHeight)
+            ? max(ceil(boundingHeight), textKitHeight)
             : textKitHeight
         return max(
             context.metrics.minimumHeight + context.frontMatterReserve,
@@ -174,6 +174,20 @@ extension BlockInputBlockItem {
                 + context.frontMatterReserve
                 + 2
         )
+    }
+
+    /// `NSString` wrapping height, carrying the block's line spacing so it stays comparable with
+    /// the TextKit measurement it is maxed against.
+    private static func boundingRectHeight(_ context: BlockInputTextHeightContext) -> CGFloat {
+        var attributes: [NSAttributedString.Key: Any] = [.font: context.font]
+        if context.lineSpacing > 0 {
+            attributes[.paragraphStyle] = paragraphStyle(indentationLevel: 0, lineSpacing: context.lineSpacing)
+        }
+        return (context.text as NSString).boundingRect(
+            with: NSSize(width: context.availableTextWidth, height: CGFloat.greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes
+        ).height
     }
 
     private static func isShortSingleLine(_ text: String, likelyFitting width: CGFloat, font: NSFont) -> Bool {
@@ -187,6 +201,8 @@ extension BlockInputBlockItem {
         return CGFloat(text.utf16.count) * conservativeCharacterWidth <= width
     }
 
+    /// Deliberately spacing-free: `NSParagraphStyle.lineSpacing` grows the gaps *between* lines
+    /// and leaves the last one alone, so a one-line height must not carry it.
     private static func singleLineTextHeight(font: NSFont) -> CGFloat {
         let boundingRect = (" " as NSString).boundingRect(
             with: NSSize(width: 120, height: CGFloat.greatestFiniteMagnitude),
@@ -203,9 +219,14 @@ extension BlockInputBlockItem {
         hiddenDelimiterRanges: [NSRange] = [],
         inlineCodeRanges: [BlockInputInlineCodeRange] = [],
         style: BlockInputStyle = .default,
+        lineSpacing: CGFloat = 0,
         inlineChipMeasurement: BlockInputInlineChipHeightMeasurement? = nil
     ) -> CGFloat {
-        let textStorage = NSTextStorage(string: text, attributes: [.font: font])
+        var baseAttributes: [NSAttributedString.Key: Any] = [.font: font]
+        if lineSpacing > 0 {
+            baseAttributes[.paragraphStyle] = paragraphStyle(indentationLevel: 0, lineSpacing: lineSpacing)
+        }
+        let textStorage = NSTextStorage(string: text, attributes: baseAttributes)
         let layoutManager = NSLayoutManager()
         let delimiterGlyphs = hiddenDelimiterRanges.isEmpty ? nil : BlockInputDelimiterGlyphs()
         layoutManager.delegate = delimiterGlyphs
@@ -324,6 +345,9 @@ private struct BlockInputTextHeightContext {
     var containsInlineChip: Bool
     var containsInlineImage: Bool
     var frontMatterReserve: CGFloat
+    /// Mirrors `BlockInputBlockItem.lineSpacing(for:style:)` so offscreen heights match rows
+    /// laid out with the same paragraph style.
+    var lineSpacing: CGFloat
     var style: BlockInputStyle
     var block: BlockInputBlock
     var fileBaseURL: URL?

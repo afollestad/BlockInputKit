@@ -87,26 +87,6 @@ extension BlockInputView {
         return true
     }
 
-    func invalidateLayoutForBlock(
-        at index: Int,
-        editedItem: BlockInputBlockItem? = nil,
-        block: BlockInputBlock? = nil
-    ) {
-        if let flowLayout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
-            let context = NSCollectionViewFlowLayoutInvalidationContext()
-            context.invalidateFlowLayoutDelegateMetrics = true
-            flowLayout.invalidateLayout(with: context)
-        } else {
-            collectionView.collectionViewLayout?.invalidateLayout()
-        }
-        collectionView.layoutSubtreeIfNeeded()
-        if let editedItem, let block {
-            resizeVisibleItem(editedItem, for: block)
-        }
-        reflowVisibleItemsAfterHeightChange(startingAt: index)
-        invalidatePreferredHeight()
-    }
-
     func deleteVisibleBlock(at index: Int, deletedBlockIDs: [BlockInputBlockID] = []) {
         let indexPath = IndexPath(item: index, section: 0)
         if shouldDeferGranularCountLayout {
@@ -179,63 +159,6 @@ extension BlockInputView {
         restoreMountedSelection()
         invalidatePreferredHeight()
         return true
-    }
-
-    /// Whether the flow layout's cached metric no longer matches the block's
-    /// measured height. Height-changing replacements (a paragraph becoming a
-    /// table, table rows added or removed) must refresh delegate metrics, or
-    /// `collectionViewContentSize` keeps the old height and the scroll range
-    /// clips the block; height-neutral replacements stay on the cheap path.
-    func flowLayoutHeightIsStale(for block: BlockInputBlock, at index: Int) -> Bool {
-        guard let cachedHeight = collectionView.collectionViewLayout?
-            .layoutAttributesForItem(at: IndexPath(item: index, section: 0))?.size.height else {
-            return true
-        }
-        let measuredHeight = measuredBlockItemHeight(
-            for: block,
-            itemWidth: availableBlockItemWidth,
-            isDocumentStartBlock: index == 0
-        )
-        return abs(cachedHeight - measuredHeight) > 0.5
-    }
-
-    func resizeVisibleItem(_ item: BlockInputBlockItem, for block: BlockInputBlock) {
-        let itemWidth = item.view.bounds.width > 0 ? item.view.bounds.width : collectionView.bounds.width
-        let height = measuredBlockItemHeight(
-            for: block,
-            itemWidth: itemWidth,
-            isDocumentStartBlock: item.isDocumentStartBlock
-        )
-        guard abs(item.view.frame.height - height) > 0.5 else {
-            return
-        }
-        item.view.frame.size.height = height
-        item.view.needsLayout = true
-        item.view.layoutSubtreeIfNeeded()
-    }
-
-    func reflowVisibleItemsAfterHeightChange(startingAt index: Int) {
-        let indexedItems = collectionView.visibleItems().compactMap { item -> (index: Int, item: NSCollectionViewItem)? in
-            guard let itemIndex = collectionView.indexPath(for: item)?.item,
-                  itemIndex >= index else {
-                return nil
-            }
-            return (itemIndex, item)
-        }.sorted { $0.index < $1.index }
-        guard let first = indexedItems.first, first.index == index else {
-            return
-        }
-
-        // NSCollectionViewFlowLayout can leave stale origins for already-mounted
-        // rows after a delegate-height change; fix only the visible run so the
-        // edited block does not overlap the next mounted blocks while typing.
-        var nextMinY = first.item.view.frame.minY
-        for indexedItem in indexedItems {
-            var frame = indexedItem.item.view.frame
-            frame.origin.y = nextMinY
-            indexedItem.item.view.frame = frame
-            nextMinY = frame.maxY
-        }
     }
 
     func hideReorderHandles(except hoveredItem: BlockInputBlockItem? = nil) {
