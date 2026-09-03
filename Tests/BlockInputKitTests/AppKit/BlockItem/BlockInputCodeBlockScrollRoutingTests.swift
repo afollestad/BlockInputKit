@@ -122,7 +122,12 @@ final class BlockInputCodeBlockScrollRoutingTests: XCTestCase {
     }
 
     func testOuterEditorScrollViewClampsHorizontalOrigin() throws {
-        let mounted = makeMountedBlockInputView(blocks: [Self.longCodeBlock()])
+        // Mounted shorter than the block so the vertical offset below is a legitimate scroll
+        // position; a document that fits its viewport is pulled back to zero.
+        let mounted = makeMountedBlockInputView(
+            configuration: BlockInputConfiguration(document: BlockInputDocument(blocks: [Self.longCodeBlock()])),
+            size: NSSize(width: 720, height: 40)
+        )
         let outerScrollView = try XCTUnwrap(mounted.view.testingOuterScrollView)
 
         outerScrollView.contentView.scroll(to: NSPoint(x: 48, y: 10))

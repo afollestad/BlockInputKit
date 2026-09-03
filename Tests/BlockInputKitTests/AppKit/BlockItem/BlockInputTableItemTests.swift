@@ -252,7 +252,7 @@ final class BlockInputTableItemTests: XCTestCase {
         let parentScrollView = try XCTUnwrap(item.view.enclosingScrollView as? TableRecordingScrollView)
 
         item.testingTableOverflowScrollView.scrollWheel(with: try Self.scrollEvent(deltaY: -12, deltaX: -1))
-        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        waitForNextMainLoopTurn()
         item.testingTableOverflowScrollView.scrollWheel(with: try Self.scrollEvent(deltaY: -1, deltaX: -12))
 
         XCTAssertEqual(parentScrollView.verticalScrollCount, 1)

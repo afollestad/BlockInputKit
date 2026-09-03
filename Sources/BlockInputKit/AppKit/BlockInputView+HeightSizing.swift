@@ -148,7 +148,9 @@ extension BlockInputView {
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
-    private func currentDocumentContentHeight() -> CGFloat {
+    /// Content height as the mounted rows know it, never below the viewport. Internal so the
+    /// document-size sync can share the same reading of "fits" as the offset clamps here.
+    func currentDocumentContentHeight() -> CGFloat {
         let layoutHeight = collectionView.collectionViewLayout?.collectionViewContentSize.height ?? 0
         // While typing, mounted item frames can update before the flow layout's content size catches up.
         let visibleItemHeight = collectionView.visibleItems().reduce(CGFloat(0)) { height, item in

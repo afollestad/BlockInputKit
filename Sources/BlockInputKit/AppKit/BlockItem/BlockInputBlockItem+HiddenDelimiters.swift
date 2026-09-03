@@ -1,7 +1,40 @@
 import AppKit
 
-/// Layout-manager delegate that collapses attributed Markdown source delimiters into zero-width glyphs.
+/// Layout-manager delegate that collapses attributed Markdown source delimiters into zero-width
+/// glyphs and keeps an inline code span on one line.
+///
+/// It is the delegate of every mounted text view, of table cells, and of the offscreen height
+/// measurement alike, which is what keeps rendering and measurement wrapping at the same places:
+/// a break rule that lived only on the mounted side would render a line the measured height had
+/// no room for.
 final class BlockInputDelimiterGlyphs: NSObject, NSLayoutManagerDelegate {
+    /// Refuses a word break inside an inline code span, so a span that does not fit moves to
+    /// the next line whole, the way a chip does. Breaks before the opening backtick and after
+    /// the closing one stay allowed; a span wider than the whole line still breaks by character,
+    /// because TextKit falls back to that once no word break fits.
+    func layoutManager(_ layoutManager: NSLayoutManager, shouldBreakLineByWordBeforeCharacterAt charIndex: Int) -> Bool {
+        !Self.isInsideInlineCodeSpan(at: charIndex, in: layoutManager)
+    }
+
+    func layoutManager(
+        _ layoutManager: NSLayoutManager,
+        shouldBreakLineByHyphenatingBeforeCharacterAt charIndex: Int
+    ) -> Bool {
+        !Self.isInsideInlineCodeSpan(at: charIndex, in: layoutManager)
+    }
+
+    /// A break before `charIndex` splits a span only when the characters on both sides of it
+    /// carry the span attribute.
+    private static func isInsideInlineCodeSpan(at charIndex: Int, in layoutManager: NSLayoutManager) -> Bool {
+        guard charIndex > 0,
+              let textStorage = layoutManager.textStorage,
+              charIndex < textStorage.length else {
+            return false
+        }
+        return textStorage.attribute(.blockInputInlineCode, at: charIndex - 1, effectiveRange: nil) as? Bool == true
+            && textStorage.attribute(.blockInputInlineCode, at: charIndex, effectiveRange: nil) as? Bool == true
+    }
+
     func layoutManager(
         _ layoutManager: NSLayoutManager,
         shouldGenerateGlyphs glyphs: UnsafePointer<CGGlyph>,
@@ -85,4 +118,7 @@ extension NSAttributedString.Key {
     static let blockInputInlineChip = NSAttributedString.Key("BlockInputInlineChip")
     /// Marks source delimiters/tags that should stay in storage but collapse out of visual layout.
     static let blockInputHiddenDelimiter = NSAttributedString.Key("BlockInputHiddenDelimiter")
+    /// Marks an inline code span, delimiters included, so `BlockInputDelimiterGlyphs` can refuse
+    /// line breaks inside it. Applied by both the mounted styling and the offscreen measurement.
+    static let blockInputInlineCode = NSAttributedString.Key("BlockInputInlineCode")
 }

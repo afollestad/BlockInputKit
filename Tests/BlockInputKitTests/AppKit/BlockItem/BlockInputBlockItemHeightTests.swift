@@ -121,6 +121,48 @@ final class BlockInputBlockItemHeightTests: XCTestCase {
         }
     }
 
+    /// Inline code spans refuse to wrap mid-span, so the mounted container can start a new
+    /// line earlier than plain text would. Measurement must take the same breaks.
+    @MainActor
+    func testMeasuredHeightMatchesMountedInlineCodeSpansAcrossWrapBoundaries() throws {
+        let block = BlockInputBlock(
+            kind: .paragraph,
+            text: "Call `read_diff` to page the diff, then `swift package resolve --force` and `xcodegen generate` "
+                + "before `./scripts/build.sh` runs, judging `every file` as a whole."
+        )
+        let metrics = BlockInputBlockItem.verticalMetrics(for: block)
+        let font = BlockInputBlockItem.font(for: block.kind, style: .default)
+        let lineHeight = ceil(font.ascender - font.descender + font.leading)
+
+        for itemWidth in stride(from: 320.0, through: 720.0, by: 2.0) {
+            let measuredHeight = BlockInputBlockItem.height(
+                for: block,
+                textWidth: BlockInputBlockItem.measuredTextWidth(
+                    for: itemWidth,
+                    block: block,
+                    allowsReordering: false
+                )
+            )
+            let item = BlockInputBlockItem.configuredForTesting(
+                block: block,
+                allowsReordering: false,
+                delegate: BlockInputView()
+            )
+            item.view.frame = NSRect(x: 0, y: 0, width: itemWidth, height: measuredHeight)
+            item.view.layoutSubtreeIfNeeded()
+            let textView = try XCTUnwrap(item.testingTextView)
+            let textContainer = try XCTUnwrap(textView.textContainer)
+            let layoutManager = try XCTUnwrap(textView.layoutManager)
+            layoutManager.ensureLayout(for: textContainer)
+            let renderedHeight = ceil(layoutManager.usedRect(for: textContainer).maxY)
+                + metrics.topContentInset
+                + metrics.bottomContentInset
+
+            XCTAssertLessThanOrEqual(renderedHeight, measuredHeight, "item width \(itemWidth)")
+            XCTAssertLessThan(measuredHeight - renderedHeight, lineHeight, "phantom line at item width \(itemWidth)")
+        }
+    }
+
     @MainActor
     func testListHeightAccountsForIndentedTextWidth() {
         let text = Array(repeating: "Wrapped list content", count: 8).joined(separator: " ")

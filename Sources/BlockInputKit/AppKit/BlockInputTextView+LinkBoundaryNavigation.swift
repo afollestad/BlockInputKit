@@ -1,7 +1,7 @@
 import AppKit
 
 extension BlockInputTextView {
-    /// Keeps plain left/right movement aligned with the visible link/chip boundary, not hidden Markdown source bytes.
+    /// Keeps plain left/right movement aligned with visible text — link and chip boundaries, inline code content — not hidden Markdown source bytes.
     func handleLinkBoundaryMovementCommand(_ selector: Selector) -> Bool {
         switch selector {
         case #selector(moveLeft(_:)):

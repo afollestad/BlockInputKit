@@ -345,7 +345,7 @@ final class BlockInputViewUndoTests: XCTestCase {
         item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
 
         _ = mounted.view.undoTextEditInActiveBlock()
-        RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.05))
+        waitForNextMainLoopTurn()
 
         let restoredItem = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
         XCTAssertEqual(restoredItem.testingTextView?.selectedRange(), NSRange(location: 1, length: 3))

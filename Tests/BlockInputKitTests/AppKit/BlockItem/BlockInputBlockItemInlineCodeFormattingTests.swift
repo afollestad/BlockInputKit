@@ -162,6 +162,76 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
     }
 
     @MainActor
+    func testInlineCodeStylesEverySpanWhenAnOpenerClosesOnTheNextLine() throws {
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: "a `b\nc` d `e` f"),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
+
+        XCTAssertEqual(
+            textStorage.attribute(.backgroundColor, at: 3, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
+        XCTAssertEqual(
+            textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 8, effectiveRange: nil), "`d` sits between spans")
+        XCTAssertEqual(
+            textStorage.attribute(.backgroundColor, at: 11, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
+        XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 6, effectiveRange: nil) as? Bool, true)
+        XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 12, effectiveRange: nil) as? Bool, true)
+    }
+
+    /// Sweeps container widths so that, without the no-wrap rule, some width splits the span
+    /// across two line fragments. With it, the whole span moves to the next line instead.
+    @MainActor
+    func testInlineCodeSpanNeverWrapsMidSpan() throws {
+        let text = "Run the release checklist and then `swift package resolve --force` afterwards"
+        let contentRange = try XCTUnwrap(BlockInputCodeParsing.inlineCodeRanges(in: text).first?.contentRange)
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        for width in stride(from: 240.0, through: 420.0, by: 4.0) {
+            let layoutManager = try preparedLayoutManager(for: textView, width: width)
+            let firstGlyph = layoutManager.glyphIndexForCharacter(at: contentRange.location)
+            let lastGlyph = layoutManager.glyphIndexForCharacter(at: NSMaxRange(contentRange) - 1)
+            let firstLine = layoutManager.lineFragmentRect(forGlyphAt: firstGlyph, effectiveRange: nil)
+            let lastLine = layoutManager.lineFragmentRect(forGlyphAt: lastGlyph, effectiveRange: nil)
+
+            XCTAssertEqual(firstLine.minY, lastLine.minY, accuracy: 0.5, "span split at width \(width)")
+            XCTAssertLessThanOrEqual(layoutManager.usedRect(for: try XCTUnwrap(textView.textContainer)).width, width + 0.5)
+        }
+    }
+
+    @MainActor
+    func testInlineCodeSpanWiderThanTheLineStillWrapsInsideTheContainer() throws {
+        let text = "`" + Array(repeating: "package-resolve-force", count: 6).joined(separator: " ") + "`"
+        let item = BlockInputBlockItem.configuredForTesting(
+            block: BlockInputBlock(id: "paragraph", kind: .paragraph, text: text),
+            allowsReordering: true,
+            delegate: BlockInputView()
+        )
+        let textView = try XCTUnwrap(item.testingTextView)
+        let width: CGFloat = 240
+        let layoutManager = try preparedLayoutManager(for: textView, width: width)
+        let textContainer = try XCTUnwrap(textView.textContainer)
+        let usedRect = layoutManager.usedRect(for: textContainer)
+        let lineHeight = layoutManager.lineFragmentRect(forGlyphAt: 1, effectiveRange: nil).height
+
+        XCTAssertLessThanOrEqual(usedRect.width, width + 0.5)
+        XCTAssertGreaterThan(usedRect.height, lineHeight * 1.5, "an overlong span must still wrap")
+    }
+
+    @MainActor
     func testInlineCodeIsIgnoredInCodeBlocks() throws {
         let item = BlockInputBlockItem.configuredForTesting(
             block: BlockInputBlock(id: "code", kind: .code(language: "swift"), text: "let value = `debug`"),
@@ -222,11 +292,17 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
 }
 
 @MainActor
-private func preparedLayoutManager(for textView: NSTextView) throws -> NSLayoutManager {
-    textView.frame = NSRect(x: 0, y: 0, width: 320, height: 60)
-    textView.textContainer?.containerSize = NSSize(width: 320, height: CGFloat.greatestFiniteMagnitude)
-    let layoutManager = try XCTUnwrap(textView.layoutManager)
+private func preparedLayoutManager(for textView: NSTextView, width: CGFloat = 320) throws -> NSLayoutManager {
+    textView.frame = NSRect(x: 0, y: 0, width: width, height: 60)
     let textContainer = try XCTUnwrap(textView.textContainer)
+    textContainer.widthTracksTextView = false
+    textContainer.lineFragmentPadding = 0
+    textContainer.containerSize = NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
+    let layoutManager = try XCTUnwrap(textView.layoutManager)
+    layoutManager.invalidateLayout(
+        forCharacterRange: NSRange(location: 0, length: (textView.string as NSString).length),
+        actualCharacterRange: nil
+    )
     layoutManager.ensureLayout(for: textContainer)
     return layoutManager
 }

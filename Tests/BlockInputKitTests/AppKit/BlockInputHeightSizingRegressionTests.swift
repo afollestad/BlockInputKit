@@ -209,6 +209,78 @@ final class BlockInputHeightSizingRegressionTests: XCTestCase {
         XCTAssertFalse(transitions.last?.isInitial ?? true)
     }
 
+    /// The host shrinks the editor to the new preferred height only after the deferred shrink
+    /// sync has run, so the frame write and the offset clamp arrive in that order.
+    func testHeightSizedDocumentScrolledToBottomUnscrollsWhenContentShrinksThenHostResizes() async throws {
+        let mounted = try makeOverflowingHeightSizedView()
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.string = "One"
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        await Task.yield()
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+
+        assertDocumentFitsUnscrolled(mounted.view)
+    }
+
+    /// The opposite order: SwiftUI can apply the new preferred height before the deferred
+    /// shrink sync fires, so the document view already fits when that sync runs.
+    func testHeightSizedDocumentScrolledToBottomUnscrollsWhenHostResizesBeforeShrinkSync() async throws {
+        let mounted = try makeOverflowingHeightSizedView()
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.string = "One"
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+        await Task.yield()
+
+        assertDocumentFitsUnscrolled(mounted.view)
+    }
+
+    func testHeightSizedDocumentUnscrollsWhenInlineCodeSpansShortenTheParagraph() async throws {
+        let mounted = try makeOverflowingHeightSizedView()
+        let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+        let textView = try XCTUnwrap(item.testingTextView)
+
+        textView.string = "Run `git status` then `git log` and `swift build` now"
+        item.textDidChange(Notification(name: NSText.didChangeNotification, object: textView))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+        await Task.yield()
+
+        assertDocumentFitsUnscrolled(mounted.view)
+    }
+
+    /// A height-sized editor at its maximum line count whose one paragraph overflows it,
+    /// scrolled to the bottom the way a caret at the end of the paragraph leaves it.
+    private func makeOverflowingHeightSizedView() throws -> (view: BlockInputView, window: NSWindow) {
+        let mounted = makeMountedBlockInputView(configuration: BlockInputConfiguration(
+            document: BlockInputDocument(blocks: [
+                BlockInputBlock(id: "first", text: String(repeating: "wrapping paragraph text ", count: 40))
+            ]),
+            editorVerticalInset: 10,
+            blockVerticalInsetMultiplier: 0.7,
+            heightSizing: BlockInputEditorHeightSizing(defaultVisibleLineCount: 2, maximumVisibleLineCount: 6)
+        ), size: NSSize(width: 360, height: 200))
+        resizeMountedBlockInputView(mounted, to: NSSize(width: 360, height: mounted.view.preferredHeight(forWidth: 360)))
+        let scrollView = mounted.view.scrollView
+        let bottomOffset = max(0, mounted.view.collectionView.frame.height - scrollView.contentSize.height)
+        XCTAssertGreaterThan(bottomOffset, 0, "the paragraph must overflow the maximum line count")
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: bottomOffset))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        XCTAssertGreaterThan(scrollView.contentView.bounds.minY, 0)
+        return mounted
+    }
+
+    private func assertDocumentFitsUnscrolled(_ view: BlockInputView, file: StaticString = #filePath, line: UInt = #line) {
+        let scrollView = view.scrollView
+        XCTAssertLessThanOrEqual(view.collectionView.frame.height, scrollView.contentSize.height + 0.5, file: file, line: line)
+        XCTAssertEqual(scrollView.contentView.bounds.minY, 0, accuracy: 0.5, file: file, line: line)
+        XCTAssertEqual(scrollView.verticalScrollElasticity, .none, file: file, line: line)
+        XCTAssertTrue(scrollView.verticalScroller?.isHidden ?? true, file: file, line: line)
+    }
+
     private func configuredView(text: String) -> BlockInputView {
         let view = BlockInputView(frame: NSRect(x: 0, y: 0, width: 360, height: 200))
         view.configure(BlockInputConfiguration(

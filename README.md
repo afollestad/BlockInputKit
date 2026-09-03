@@ -130,7 +130,8 @@ let configuration = BlockInputConfiguration(
 `BlockInputEditorChromeStyle` when the editor should draw its own rounded fill, stroke, and optional clipping. Chrome
 can round all corners, top corners, bottom corners, or an explicit corner set. `dropIndicatorColor`, selection colors,
 inline code, code block, image block, and inline chip styling are also configurable. Link-backed chips use their chip
-foreground color instead of the system link text color.
+foreground color instead of the system link text color. An inline code span never wraps mid-span: one that does not
+fit at the end of a line moves to the next line whole.
 
 `blockVerticalInsetMultiplier` adjusts vertical padding inside rendered block rows without changing horizontal layout or
 the editor's outer `editorVerticalInset`. `1` preserves the built-in spacing, values below `1` make rows denser, and

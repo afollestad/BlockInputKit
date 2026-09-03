@@ -24,6 +24,16 @@ extension BlockInputView {
         let isShrinkingHeight = collectionView.frame.height - targetHeight > 0.5
         let heightChanged = isShrinkingHeight || targetHeight - collectionView.frame.height > 0.5
         updateDocumentScrollElasticity(contentHeight: targetHeight, visibleHeight: visibleHeight)
+        // A document that fits its viewport has no scroll range, so any offset left over from
+        // when it overflowed strands the top of the content above the clip with no way to
+        // scroll it back: elasticity is already off and no frame write follows to trigger the
+        // shrink-time clamp below. Reset it here, on every pass, before the no-op guard. The
+        // fit check reads mounted item frames too, because a caret scroll can run while the
+        // flow layout's content size still reports the row's height from before the edit.
+        if currentDocumentContentHeight() - visibleHeight <= 0.5, scrollView.contentView.bounds.origin.y > 0.5 {
+            scrollView.contentView.scroll(to: .zero)
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
         guard widthChanged || heightChanged else {
             return
         }

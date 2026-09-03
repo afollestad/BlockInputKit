@@ -298,5 +298,5 @@ final class BlockInputTextCommandTests: XCTestCase {
 
 @MainActor
 private func runSelectionRestoreCycle() {
-    RunLoop.main.run(until: Date(timeIntervalSinceNow: 0.02))
+    waitForNextMainLoopTurn()
 }

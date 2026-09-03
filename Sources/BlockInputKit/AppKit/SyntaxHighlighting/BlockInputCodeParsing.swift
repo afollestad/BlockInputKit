@@ -11,6 +11,12 @@ struct BlockInputCodeFenceOpening: Equatable {
 }
 
 enum BlockInputCodeParsing {
+    /// Single-backtick code spans, paired the way CommonMark pairs them: an opener matches the
+    /// next lone backtick, a line ending inside the span is content, and an unmatched backtick is
+    /// literal, as is everything after it. Pairing used to stop at a line ending, which
+    /// stranded a closer on the next line; that stray backtick then opened a bogus span and
+    /// shifted every later pairing on its line — the stored Markdown renders them paired, so the
+    /// editor has to as well. Runs of two or more backticks are neither openers nor closers.
     static func inlineCodeRanges(in text: String) -> [BlockInputInlineCodeRange] {
         let nsText = text as NSString
         guard nsText.length > 0 else {
@@ -42,7 +48,10 @@ enum BlockInputCodeParsing {
                 ))
                 location = closingLocation + 1
             } else {
-                location = openingLocation + 1
+                // The closer search reached the end of the text without finding another lone
+                // backtick, so no later opener can close either; scanning on would rescan the
+                // tail once per stray backtick.
+                break
             }
         }
         return ranges
@@ -64,8 +73,6 @@ enum BlockInputCodeParsing {
     }
 
     private static let backtick: unichar = 0x60
-    private static let lineFeed: unichar = 0x0A
-    private static let carriageReturn: unichar = 0x0D
 
     private static func consecutiveBackticks(in text: NSString, from location: Int) -> Int {
         var length = 0
@@ -79,11 +86,7 @@ enum BlockInputCodeParsing {
     private static func closingSingleBacktickLocation(in text: NSString, from startLocation: Int) -> Int? {
         var location = startLocation
         while location < text.length {
-            let character = text.character(at: location)
-            if character == lineFeed || character == carriageReturn {
-                return nil
-            }
-            guard character == backtick else {
+            guard text.character(at: location) == backtick else {
                 location += 1
                 continue
             }

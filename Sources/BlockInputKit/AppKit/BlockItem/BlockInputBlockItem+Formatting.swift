@@ -285,6 +285,7 @@ extension BlockInputBlockItem {
         textStorage.removeAttribute(.blockInputInlineChip, range: fullRange)
         textStorage.removeAttribute(.blockInputInlineImage, range: fullRange)
         textStorage.removeAttribute(.blockInputHiddenDelimiter, range: fullRange)
+        textStorage.removeAttribute(.blockInputInlineCode, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyBaseParagraphStyle(for: block, textStorage: textStorage, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
@@ -303,20 +304,9 @@ extension BlockInputBlockItem {
         guard let block = renderedBlock else {
             return
         }
-        var attributes = textView.typingAttributes
         let font = Self.font(for: block.kind, style: style)
+        var attributes = Self.strippingInlineStyleOverrides(from: textView.typingAttributes)
         attributes[.font] = font
-        attributes.removeValue(forKey: .foregroundColor)
-        attributes.removeValue(forKey: .backgroundColor)
-        attributes.removeValue(forKey: .underlineStyle)
-        attributes.removeValue(forKey: .strikethroughStyle)
-        attributes.removeValue(forKey: .link)
-        attributes.removeValue(forKey: .toolTip)
-        attributes.removeValue(forKey: .kern)
-        attributes.removeValue(forKey: .baselineOffset)
-        attributes.removeValue(forKey: .blockInputInlineChip)
-        attributes.removeValue(forKey: .blockInputInlineImage)
-        attributes.removeValue(forKey: .blockInputHiddenDelimiter)
         if let foregroundColor = typingForegroundColor(for: block.kind) {
             attributes[.foregroundColor] = foregroundColor
         }
@@ -325,6 +315,7 @@ extension BlockInputBlockItem {
             attributes[.font] = inlineCodeFont(for: font)
             attributes[.foregroundColor] = inlineCodeForegroundColor()
             attributes[.backgroundColor] = inlineCodeBackgroundColor()
+            attributes[.blockInputInlineCode] = true
         } else {
             attributes = Self.applyingInlineMarkdownStyles(
                 inlineMarkdownStylesForCurrentSelection(in: block),
@@ -352,6 +343,22 @@ extension BlockInputBlockItem {
             textView.defaultParagraphStyle = nil
         }
         textView.typingAttributes = attributes
+    }
+
+    /// Every attribute an inline style writes, cleared so the caret's position alone decides
+    /// which styles the next keystroke inherits.
+    private static func strippingInlineStyleOverrides(
+        from typingAttributes: [NSAttributedString.Key: Any]
+    ) -> [NSAttributedString.Key: Any] {
+        var attributes = typingAttributes
+        for key: NSAttributedString.Key in [
+            .foregroundColor, .backgroundColor, .underlineStyle, .strikethroughStyle, .link, .toolTip, .kern,
+            .baselineOffset, .blockInputInlineChip, .blockInputInlineImage, .blockInputHiddenDelimiter,
+            .blockInputInlineCode
+        ] {
+            attributes.removeValue(forKey: key)
+        }
+        return attributes
     }
 
     func applyKindLabelAttributes(for block: BlockInputBlock) {

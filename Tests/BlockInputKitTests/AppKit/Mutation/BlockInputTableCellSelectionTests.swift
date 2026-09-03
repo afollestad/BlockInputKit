@@ -32,7 +32,7 @@ final class BlockInputTableCellSelectionTests: XCTestCase {
             )
             .selection(blockID: "table", position: .init(row: .body(0), column: 0), localRange: NSRange(location: 1, length: 0))
         )
-        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        waitForNextMainLoopTurn()
         XCTAssertTrue(item.testingSelectionBackgroundView.isHidden)
     }
 

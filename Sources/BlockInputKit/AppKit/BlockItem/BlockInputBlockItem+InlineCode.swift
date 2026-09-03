@@ -12,6 +12,10 @@ extension BlockInputBlockItem {
         let foregroundColor = inlineCodeForegroundColor()
         let backgroundColor = inlineCodeBackgroundColor()
         for inlineCodeRange in BlockInputCodeParsing.inlineCodeRanges(in: textStorage.string) {
+            let spanRange = NSIntersectionRange(inlineCodeRange.fullRange, fullRange)
+            if spanRange.length > 0 {
+                textStorage.addAttribute(.blockInputInlineCode, value: true, range: spanRange)
+            }
             let contentRange = NSIntersectionRange(inlineCodeRange.contentRange, fullRange)
             if contentRange.length > 0 {
                 textStorage.addAttributes(

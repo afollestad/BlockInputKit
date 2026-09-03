@@ -1,12 +1,21 @@
 import AppKit
 
-/// Visible-text offset tables and boundary targets for caret movement across
-/// hidden link and inline-image source spans.
+/// Visible-text offset tables and boundary targets for caret movement across hidden Markdown
+/// source: link and inline-image spans, and the backtick delimiters of inline code.
+///
+/// Every hidden character is a zero-width glyph, so a caret on either side of it draws at the
+/// same x. Without these tables an arrow key appears dead once per hidden character, and a
+/// Backspace at one of those invisible stops deletes a delimiter the user cannot see. Inline
+/// code only contributes its delimiters to `hiddenOffsets`; the link-edge and inline-image
+/// rules below stay link-specific. A rightward hop lands after the next visible character, so
+/// it rests inside a span it just entered, and a leftward hop rests outside; that mirrors
+/// links, and Backspace right after a span still deletes its closing backtick.
 struct BlockInputInlineLinkNavigation {
     private let sourceText: String
     private let text: NSString
     private let visibleText: String
     private let linkRanges: [BlockInputInlineMarkdownRange]
+    private let hasInlineCodeDelimiters: Bool
     private let hiddenOffsets: [Bool]
     private let sourceToVisibleOffsets: [Int]
     private let visibleToSourceBeforeNext: [Int]
@@ -15,20 +24,25 @@ struct BlockInputInlineLinkNavigation {
     init(text: String, fileBaseURL: URL?, inlineImages: Bool = true) {
         sourceText = text
         self.text = text as NSString
-        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text).map(\.fullRange)
+        let inlineCodeRanges = BlockInputCodeParsing.inlineCodeRanges(in: text)
         // Inline images navigate like links with a one-character visible span: the
         // anchor is the only visible byte and the hidden source skips as one unit.
         let parsedLinkRanges = BlockInputInlineMarkdownParsing.inlineMarkdownRanges(
             in: text,
-            excluding: inlineCodeRanges,
+            excluding: inlineCodeRanges.map(\.fullRange),
             fileBaseURL: fileBaseURL,
             inlineImages: inlineImages
         )
         .filter { $0.style == .link || $0.style == .inlineImage }
         linkRanges = parsedLinkRanges
+        let inlineCodeDelimiterRanges = inlineCodeRanges.flatMap(\.delimiterRanges)
+        hasInlineCodeDelimiters = !inlineCodeDelimiterRanges.isEmpty
 
         let textLength = self.text.length
-        hiddenOffsets = Self.hiddenOffsets(in: parsedLinkRanges, textLength: textLength)
+        hiddenOffsets = Self.hiddenOffsets(
+            in: parsedLinkRanges.flatMap(\.delimiterRanges) + inlineCodeDelimiterRanges,
+            textLength: textLength
+        )
         let visibleOffsets = Self.visibleOffsetTables(in: self.text, hiddenOffsets: hiddenOffsets)
         sourceToVisibleOffsets = visibleOffsets.sourceToVisibleOffsets
         visibleText = visibleOffsets.visibleText
@@ -36,12 +50,17 @@ struct BlockInputInlineLinkNavigation {
         visibleToSourceAfterPrevious = visibleOffsets.visibleToSourceAfterPrevious
     }
 
+    /// Whether any hidden source exists to hop; without it every movement stays native.
+    private var hasHiddenSource: Bool {
+        !linkRanges.isEmpty || hasInlineCodeDelimiters
+    }
+
     private static func hiddenOffsets(
-        in linkRanges: [BlockInputInlineMarkdownRange],
+        in delimiterRanges: [NSRange],
         textLength: Int
     ) -> [Bool] {
         var hiddenOffsets = [Bool](repeating: false, count: textLength)
-        for range in linkRanges.flatMap(\.delimiterRanges) {
+        for range in delimiterRanges {
             let clampedRange = NSIntersectionRange(range, NSRange(location: 0, length: textLength))
             guard clampedRange.length > 0 else {
                 continue
@@ -104,7 +123,7 @@ struct BlockInputInlineLinkNavigation {
         from offset: Int,
         direction: BlockInputHorizontalMovementDirection
     ) -> HiddenLinkBoundaryTarget? {
-        guard !linkRanges.isEmpty,
+        guard hasHiddenSource,
               characterBoundaryNeedsCustomMovement(from: offset, direction: direction),
               let sourceOffset = characterBoundary(from: offset, direction: direction),
               sourceOffset != offset || characterBoundaryTouchesLinkSourceEdge(from: offset, direction: direction) else {
@@ -182,7 +201,7 @@ struct BlockInputInlineLinkNavigation {
         from offset: Int,
         direction: BlockInputHorizontalMovementDirection
     ) -> Int? {
-        guard !linkRanges.isEmpty else {
+        guard hasHiddenSource else {
             return nil
         }
         switch direction {
@@ -204,7 +223,7 @@ struct BlockInputInlineLinkNavigation {
         from offset: Int,
         direction: BlockInputWordMovementDirection
     ) -> HiddenLinkBoundaryTarget? {
-        guard !linkRanges.isEmpty,
+        guard hasHiddenSource,
               !visibleText.isEmpty else {
             return nil
         }

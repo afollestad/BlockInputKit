@@ -291,6 +291,10 @@ extension BlockInputBlockItem {
         let inlineFont = inlineCodeFont(for: font, style: style)
         let delimiterFont = inlineCodeDelimiterFont(for: font)
         for inlineCodeRange in inlineCodeRanges {
+            let spanRange = NSIntersectionRange(inlineCodeRange.fullRange, fullRange)
+            if spanRange.length > 0 {
+                textStorage.addAttribute(.blockInputInlineCode, value: true, range: spanRange)
+            }
             let contentRange = NSIntersectionRange(inlineCodeRange.contentRange, fullRange)
             if contentRange.length > 0 {
                 textStorage.addAttribute(.font, value: inlineFont, range: contentRange)
