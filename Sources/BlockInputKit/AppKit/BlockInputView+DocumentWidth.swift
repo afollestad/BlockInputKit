@@ -47,6 +47,7 @@ extension BlockInputView {
         // already invalidates from — doing it here would feed a layout pass back into itself.
         if widthChanged {
             collectionView.collectionViewLayout?.invalidateLayout()
+            scheduleFlowLayoutWidthSync()
             updateVisibleItemWidthsForCurrentWidth()
             updatePlaceholderLayout()
             invalidatePreferredHeight()
@@ -88,6 +89,8 @@ extension BlockInputView {
         guard let firstIndex = staleItems.first?.index else {
             return
         }
+        // Autoresizing can update the document width before its bounds observer sees it.
+        scheduleFlowLayoutWidthSync()
         for indexedItem in staleItems {
             guard let block = block(at: indexedItem.index) else {
                 continue
@@ -101,6 +104,32 @@ extension BlockInputView {
             indexedItem.item.view.layoutSubtreeIfNeeded()
         }
         reflowVisibleItemsAfterHeightChange(startingAt: firstIndex)
+    }
+
+    /// AppKit can retain pre-resize delegate metrics during layout, even after visible rows
+    /// rewrap. Refresh after that pass unwinds so newly mounted rows use the same geometry.
+    private func scheduleFlowLayoutWidthSync() {
+        guard !isFlowLayoutWidthSyncScheduled else {
+            return
+        }
+        isFlowLayoutWidthSyncScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            syncCollectionViewDocumentSizeForVisibleBounds()
+            isFlowLayoutWidthSyncScheduled = false
+            if let flowLayout = collectionView.collectionViewLayout as? NSCollectionViewFlowLayout {
+                let context = NSCollectionViewFlowLayoutInvalidationContext()
+                context.invalidateFlowLayoutDelegateMetrics = true
+                flowLayout.invalidateLayout(with: context)
+            } else {
+                collectionView.collectionViewLayout?.invalidateLayout()
+            }
+            collectionView.layoutSubtreeIfNeeded()
+            syncCollectionViewDocumentSizeForVisibleBounds()
+            invalidatePreferredHeight()
+        }
     }
 
     /// Height the document view needs, floored at the viewport.
