@@ -286,7 +286,8 @@ private final class CompletionPopupSnapshotView: NSView {
         backgroundColor = snapshotCase.appearance == .darkAqua
             ? NSColor(calibratedWhite: 0.11, alpha: 1)
             : NSColor.white
-        super.init(frame: NSRect(origin: .zero, size: CGSize(width: 420, height: 120)))
+        let height = max(120, BlockInputCompletionPopupView.measuredHeight(for: snapshotCase.state) + 40)
+        super.init(frame: NSRect(origin: .zero, size: CGSize(width: 420, height: height)))
         appearance = NSAppearance(named: snapshotCase.appearance)
         popupView.configure(state: snapshotCase.state, style: .default, onSelect: { _ in }, onHighlight: { _ in })
         addSubview(popupView)

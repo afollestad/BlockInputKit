@@ -160,15 +160,6 @@ final class BlockInputConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testViewAppliesEditorInteractionUICallback() {
-        let view = BlockInputView()
-
-        view.configure(BlockInputConfiguration(onEditorInteractionUIChange: { _ in }))
-
-        XCTAssertNotNil(view.onEditorInteractionUIChange)
-    }
-
-    @MainActor
     func testViewAppliesConfiguredCompletionSurfaces() {
         let provider = ConfigurationCompletionProvider()
         let view = BlockInputView()

@@ -339,7 +339,8 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
 
         XCTAssertEqual(ruleView.testingLineView?.layer?.backgroundColor, NSColor.systemPink.cgColor)
         XCTAssertEqual(ruleView.testingLineHeight, 4)
-        XCTAssertNotEqual(ruleView.layer?.backgroundColor, NSColor.clear.cgColor)
+        let selectionBackground = try XCTUnwrap(ruleView.layer?.backgroundColor)
+        XCTAssertGreaterThan(selectionBackground.alpha, 0)
     }
 
     @MainActor
@@ -353,7 +354,7 @@ final class BlockInputBlockItemFormattingTests: XCTestCase {
         item.setBlockSelection(true)
 
         XCTAssertFalse(item.testingSelectionBackgroundView.isHidden)
-        XCTAssertNotEqual(item.testingSelectionBackgroundView.layer?.backgroundColor, NSColor.clear.cgColor)
+        XCTAssertGreaterThan(item.testingSelectionBackgroundView.fillColor.alphaComponent, 0)
         XCTAssertEqual(item.view.layer?.borderWidth, CGFloat(0))
         XCTAssertEqual(item.view.layer?.backgroundColor, NSColor.clear.cgColor)
     }

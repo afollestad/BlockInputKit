@@ -83,6 +83,17 @@ final class BlockInputCompletionPopupLayoutTests: XCTestCase {
             isLoading: false
         )
         let popup = BlockInputCompletionPopupView(frame: NSRect(x: 0, y: 0, width: 320, height: 80))
+        popup.configure(
+            state: BlockInputCompletionPopupState(suggestions: [], highlightedIndex: 0, isLoading: false),
+            style: .default,
+            onSelect: { _ in },
+            onHighlight: { _ in }
+        )
+        let visibleLabels = popup.subviews.compactMap { $0 as? NSTextField }.filter { !$0.isHidden }.map(\.stringValue)
+        XCTAssertEqual(visibleLabels, ["No matches"])
+        let indicator = try XCTUnwrap(popup.subviews.compactMap { $0 as? NSProgressIndicator }.first)
+        XCTAssertTrue(indicator.isHidden)
+
         popup.configure(state: state, style: .default, onSelect: { _ in }, onHighlight: { _ in })
         popup.layoutSubtreeIfNeeded()
         let originalRow = try rowView(label: "README.md", in: popup)

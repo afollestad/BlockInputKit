@@ -257,6 +257,9 @@ final class BlockInputCompletionPopupView: NSView {
             $0.textColor = .secondaryLabelColor
         }
         [loadingIndicator, loadingField, emptyField].forEach(addSubview)
+        // The first configure can match the empty initial state and skip rebuilding.
+        loadingIndicator.isHidden = true
+        loadingField.isHidden = true
     }
 
     private func rebuild() {
