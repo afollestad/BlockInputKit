@@ -223,7 +223,7 @@ final class BlockInputInlineMarkdownFormattingTests: XCTestCase {
         XCTAssertTrue(try font(at: contentLocation("text", in: text), in: textStorage)
             .fontDescriptor.symbolicTraits.contains(.italic))
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: contentLocation("code", in: text), effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: contentLocation("code", in: text), effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
     }
@@ -248,7 +248,7 @@ final class BlockInputInlineMarkdownFormattingTests: XCTestCase {
             NSUnderlineStyle.single.rawValue
         )
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: contentLocation("code", in: text), effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: contentLocation("code", in: text), effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
     }
@@ -399,7 +399,7 @@ final class BlockInputInlineMarkdownFormattingTests: XCTestCase {
         let typingFont = try XCTUnwrap(textView.typingAttributes[.font] as? NSFont)
         XCTAssertTrue(typingFont.fontDescriptor.symbolicTraits.contains(.monoSpace))
         XCTAssertFalse(typingFont.fontDescriptor.symbolicTraits.contains(.italic))
-        XCTAssertEqual(textView.typingAttributes[.backgroundColor] as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
+        XCTAssertEqual(textView.typingAttributes[.blockInputInlineCodeBackground] as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
     }
 
     @MainActor

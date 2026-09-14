@@ -79,7 +79,7 @@ final class BlockInputInlineCodeNavigationTests: XCTestCase {
         textView.deleteBackward(nil)
 
         XCTAssertEqual(textView.string, "Use `git status now")
-        XCTAssertNil(textView.textStorage?.attribute(.backgroundColor, at: 5, effectiveRange: nil))
+        XCTAssertNil(textView.textStorage?.attribute(.blockInputInlineCodeBackground, at: 5, effectiveRange: nil))
     }
 
     private func mountedTextView(for text: String) throws -> BlockInputTextView {

@@ -22,7 +22,7 @@ extension BlockInputBlockItem {
                     [
                         .font: inlineFont,
                         .foregroundColor: foregroundColor,
-                        .backgroundColor: backgroundColor
+                        .blockInputInlineCodeBackground: backgroundColor
                     ],
                     range: contentRange
                 )
