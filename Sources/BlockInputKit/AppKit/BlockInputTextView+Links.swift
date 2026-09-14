@@ -13,6 +13,7 @@ struct BlockInputLinkHitResult {
 extension BlockInputTextView {
     override func draw(_ dirtyRect: NSRect) {
         drawInlineChipBackgrounds(in: dirtyRect)
+        drawInlineCodeBackgrounds(in: dirtyRect)
         super.draw(dirtyRect)
         // Images paint after super so selection highlight cannot wash them out.
         drawInlineImages(in: dirtyRect)

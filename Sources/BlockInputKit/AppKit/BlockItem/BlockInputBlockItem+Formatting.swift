@@ -286,6 +286,7 @@ extension BlockInputBlockItem {
         textStorage.removeAttribute(.blockInputInlineImage, range: fullRange)
         textStorage.removeAttribute(.blockInputHiddenDelimiter, range: fullRange)
         textStorage.removeAttribute(.blockInputInlineCode, range: fullRange)
+        textStorage.removeAttribute(.blockInputInlineCodeBackground, range: fullRange)
         textStorage.removeAttribute(.paragraphStyle, range: fullRange)
         applyBaseParagraphStyle(for: block, textStorage: textStorage, range: fullRange)
         applyCodeBlockAttributes(for: block, textStorage: textStorage)
@@ -314,7 +315,7 @@ extension BlockInputBlockItem {
         if isInlineCodeSelection {
             attributes[.font] = inlineCodeFont(for: font)
             attributes[.foregroundColor] = inlineCodeForegroundColor()
-            attributes[.backgroundColor] = inlineCodeBackgroundColor()
+            attributes[.blockInputInlineCodeBackground] = inlineCodeBackgroundColor()
             attributes[.blockInputInlineCode] = true
         } else {
             attributes = Self.applyingInlineMarkdownStyles(
@@ -354,7 +355,7 @@ extension BlockInputBlockItem {
         for key: NSAttributedString.Key in [
             .foregroundColor, .backgroundColor, .underlineStyle, .strikethroughStyle, .link, .toolTip, .kern,
             .baselineOffset, .blockInputInlineChip, .blockInputInlineImage, .blockInputHiddenDelimiter,
-            .blockInputInlineCode
+            .blockInputInlineCode, .blockInputInlineCodeBackground
         ] {
             attributes.removeValue(forKey: key)
         }

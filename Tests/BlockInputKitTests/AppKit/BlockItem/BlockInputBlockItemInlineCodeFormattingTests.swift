@@ -27,11 +27,11 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
             XCTAssertTrue(codeFont.fontDescriptor.symbolicTraits.contains(.monoSpace), "Expected inline code font for \(kind).")
             XCTAssertFalse(baseFont.fontDescriptor.symbolicTraits.contains(.monoSpace), "Expected base text font for \(kind).")
             XCTAssertEqual(
-                textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor,
+                textStorage.attribute(.blockInputInlineCodeBackground, at: 5, effectiveRange: nil) as? NSColor,
                 BlockInputBlockItem.inlineCodeBackgroundColor,
                 "Expected inline code background for \(kind)."
             )
-            XCTAssertNil(textStorage.attribute(.backgroundColor, at: 0, effectiveRange: nil))
+            XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 0, effectiveRange: nil))
         }
     }
 
@@ -57,15 +57,16 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
 
         XCTAssertEqual(try XCTUnwrap(textStorage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont).pointSize, inlineFont.pointSize)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemRed)
-        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor, .systemYellow)
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil))
+        XCTAssertEqual(textStorage.attribute(.blockInputInlineCodeBackground, at: 5, effectiveRange: nil) as? NSColor, .systemYellow)
+        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 15, effectiveRange: nil))
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .systemGreen)
 
         item.setSelectedRange(NSRange(location: 7, length: 0))
         XCTAssertEqual(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont).pointSize, inlineFont.pointSize)
         XCTAssertEqual(textView.typingAttributes[.foregroundColor] as? NSColor, .systemRed)
-        XCTAssertEqual(textView.typingAttributes[.backgroundColor] as? NSColor, .systemYellow)
+        XCTAssertEqual(textView.typingAttributes[.blockInputInlineCodeBackground] as? NSColor, .systemYellow)
     }
 
     @MainActor
@@ -84,8 +85,8 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 4, effectiveRange: nil) as? Bool, true)
         XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 15, effectiveRange: nil) as? Bool, true)
         XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor, .clear)
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 15, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 15, effectiveRange: nil))
     }
 
     @MainActor
@@ -98,15 +99,15 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
         var effectiveRange = NSRange(location: NSNotFound, length: 0)
 
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 3, effectiveRange: nil))
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 3, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 4, effectiveRange: nil))
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 5, effectiveRange: &effectiveRange) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 5, effectiveRange: &effectiveRange) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
         XCTAssertEqual(effectiveRange, NSRange(location: 5, length: 12))
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 17, effectiveRange: nil))
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 18, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 17, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 18, effectiveRange: nil))
     }
 
     @MainActor
@@ -134,7 +135,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
 
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .labelColor)
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 4, effectiveRange: nil))
         XCTAssertFalse(try XCTUnwrap(textStorage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -154,9 +155,12 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor, .clear)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 14, effectiveRange: nil) as? NSColor, .clear)
-        XCTAssertEqual(textStorage.attribute(.backgroundColor, at: 1, effectiveRange: nil) as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 11, effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 1, effectiveRange: nil) as? NSColor,
+            BlockInputBlockItem.inlineCodeBackgroundColor
+        )
+        XCTAssertEqual(
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 11, effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
     }
@@ -171,16 +175,16 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
 
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 3, effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 3, effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 5, effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 5, effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 8, effectiveRange: nil), "`d` sits between spans")
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 8, effectiveRange: nil), "`d` sits between spans")
         XCTAssertEqual(
-            textStorage.attribute(.backgroundColor, at: 11, effectiveRange: nil) as? NSColor,
+            textStorage.attribute(.blockInputInlineCodeBackground, at: 11, effectiveRange: nil) as? NSColor,
             BlockInputBlockItem.inlineCodeBackgroundColor
         )
         XCTAssertEqual(textStorage.attribute(.blockInputHiddenDelimiter, at: 6, effectiveRange: nil) as? Bool, true)
@@ -231,6 +235,51 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         XCTAssertGreaterThan(usedRect.height, lineHeight * 1.5, "an overlong span must still wrap")
     }
 
+    /// Attribute checks miss TextKit dropping a background when hidden delimiters wrap with the span.
+    @MainActor
+    func testWrappedInlineCodeSpansPaintEveryBackground() throws {
+        let text = "Fetch PRs that need my review from `example1/tool-android`, `example1/tool-ios`, "
+            + "`example1/android-renderer`, and `example1/ios-renderer`, skipping any that already have an Alveary thread."
+            + " Then run `first line\n" + String(repeating: "long command argument ", count: 8) + "`."
+        let ranges = BlockInputCodeParsing.inlineCodeRanges(in: text)
+        let style = BlockInputStyle(
+            baseText: BlockInputTextStyle(font: .systemFont(ofSize: 13), foregroundColor: .black),
+            inlineCode: BlockInputInlineCodeStyle(foregroundColor: .black, backgroundColor: .magenta)
+        )
+        for width in [340.0, 600.0] {
+            let mounted = makeMountedBlockInputView(
+                configuration: BlockInputConfiguration(
+                    document: BlockInputDocument(blocks: [BlockInputBlock(id: "paragraph", text: text)]),
+                    allowsBlockReordering: false,
+                    style: style
+                ),
+                size: NSSize(width: width, height: 240)
+            )
+            let item = try XCTUnwrap(mounted.view.visibleBlockItemForTesting(at: 0))
+            let textView = try XCTUnwrap(item.testingTextView)
+            textView.appearance = NSAppearance(named: .aqua)
+            let layoutManager = try XCTUnwrap(textView.layoutManager)
+            let textContainer = try XCTUnwrap(textView.textContainer)
+            layoutManager.ensureLayout(for: textContainer)
+            let bitmap = try inlineCodeBitmap(of: textView)
+            for range in ranges {
+                let glyphRange = layoutManager.glyphRange(forCharacterRange: range.contentRange, actualCharacterRange: nil)
+                let content = (text as NSString).substring(with: range.contentRange)
+                var glyph = glyphRange.location
+                while glyph < NSMaxRange(glyphRange) {
+                    var lineRange = NSRange()
+                    let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: &lineRange)
+                    let location = layoutManager.location(forGlyphAt: glyph)
+                    // Native bounding rectangles are also empty for the affected spans.
+                    let rect = NSRect(x: lineRect.minX + location.x, y: lineRect.minY, width: 4, height: lineRect.height)
+                        .offsetBy(dx: textView.textContainerOrigin.x, dy: textView.textContainerOrigin.y)
+                    XCTAssertGreaterThan(magentaPixelCount(in: rect, bitmap: bitmap), 10, "Missing fill for \(content) at width \(width)")
+                    glyph = max(glyph + 1, NSMaxRange(lineRange))
+                }
+            }
+        }
+    }
+
     @MainActor
     func testInlineCodeIsIgnoredInCodeBlocks() throws {
         let item = BlockInputBlockItem.configuredForTesting(
@@ -241,7 +290,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
 
         XCTAssertNotEqual(textStorage.attribute(.foregroundColor, at: 12, effectiveRange: nil) as? NSColor, .clear)
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 12, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 12, effectiveRange: nil))
         XCTAssertTrue(try XCTUnwrap(textStorage.attribute(.font, at: 13, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
     }
@@ -263,7 +312,7 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
 
         let textStorage = try XCTUnwrap(item.testingTextView?.textStorage)
         XCTAssertEqual(textStorage.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor, .labelColor)
-        XCTAssertNil(textStorage.attribute(.backgroundColor, at: 4, effectiveRange: nil))
+        XCTAssertNil(textStorage.attribute(.blockInputInlineCodeBackground, at: 4, effectiveRange: nil))
         XCTAssertNil(textStorage.attribute(.blockInputHiddenDelimiter, at: 4, effectiveRange: nil))
         XCTAssertFalse(try XCTUnwrap(textStorage.attribute(.font, at: 4, effectiveRange: nil) as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
@@ -281,13 +330,13 @@ final class BlockInputInlineCodeFormattingTests: XCTestCase {
         item.setSelectedRange(NSRange(location: 7, length: 0))
         XCTAssertTrue(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
-        XCTAssertEqual(textView.typingAttributes[.backgroundColor] as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
+        XCTAssertEqual(textView.typingAttributes[.blockInputInlineCodeBackground] as? NSColor, BlockInputBlockItem.inlineCodeBackgroundColor)
 
         item.setSelectedRange(NSRange(location: 18, length: 0))
         XCTAssertFalse(try XCTUnwrap(textView.typingAttributes[.font] as? NSFont)
             .fontDescriptor.symbolicTraits.contains(.monoSpace))
         XCTAssertNil(textView.typingAttributes[.foregroundColor] as? NSColor)
-        XCTAssertNil(textView.typingAttributes[.backgroundColor] as? NSColor)
+        XCTAssertNil(textView.typingAttributes[.blockInputInlineCodeBackground] as? NSColor)
     }
 }
 
@@ -310,4 +359,51 @@ private func preparedLayoutManager(for textView: NSTextView, width: CGFloat = 32
 private func glyphX(at utf16Offset: Int, layoutManager: NSLayoutManager) throws -> CGFloat {
     let glyphIndex = layoutManager.glyphIndexForCharacter(at: utf16Offset)
     return layoutManager.location(forGlyphAt: glyphIndex).x
+}
+
+@MainActor
+private func inlineCodeBitmap(of textView: NSTextView) throws -> NSBitmapImageRep {
+    let bounds = textView.bounds
+    let bitmap = try XCTUnwrap(NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: Int(ceil(bounds.width * 2)),
+        pixelsHigh: Int(ceil(bounds.height * 2)),
+        bitsPerSample: 8,
+        samplesPerPixel: 4,
+        hasAlpha: true,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ))
+    bitmap.size = bounds.size
+    let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    NSColor.white.setFill()
+    bounds.fill()
+    textView.displayIgnoringOpacity(bounds, in: context)
+    NSGraphicsContext.restoreGraphicsState()
+    return bitmap
+}
+
+private func magentaPixelCount(in rect: NSRect, bitmap: NSBitmapImageRep) -> Int {
+    let minX = max(0, Int(floor(rect.minX * 2)))
+    let maxX = min(bitmap.pixelsWide, Int(ceil(rect.maxX * 2)))
+    let minY = max(0, Int(floor(rect.minY * 2)))
+    let maxY = min(bitmap.pixelsHigh, Int(ceil(rect.maxY * 2)))
+    guard minX < maxX, minY < maxY else { return 0 }
+    var count = 0
+    for pixelY in minY..<maxY {
+        for pixelX in minX..<maxX {
+            guard let color = bitmap.colorAt(x: pixelX, y: pixelY)?.usingColorSpace(.deviceRGB),
+                  color.redComponent > 0.9,
+                  color.greenComponent < 0.1,
+                  color.blueComponent > 0.9 else {
+                continue
+            }
+            count += 1
+        }
+    }
+    return count
 }
